@@ -4,7 +4,11 @@ export const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   HOST: z.string().min(1).default('0.0.0.0'),
-  API_CORS_ORIGIN: z.string().url().default('http://localhost:3001'),
+  API_CORS_ORIGIN: z
+    .string()
+    .url()
+    .transform((value) => value.replace(/\/$/, ''))
+    .default('http://localhost:3001'),
   DATABASE_URL: z.string().url().optional(),
   SWYTCHCODE_TOKEN: z.string().min(1).optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),

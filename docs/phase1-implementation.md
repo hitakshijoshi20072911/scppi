@@ -15,6 +15,8 @@ Phase 1 adds the persistent backend foundation without implementing provider int
 
 Authentication: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, and `GET /api/v1/auth/me`.
 
+Service status: `GET /` returns a non-sensitive service identity and links to `/health/live` and `/health/ready`. The API strips one trailing slash from `API_CORS_ORIGIN` so a Render environment value such as `https://frontend.example/` still produces the browser-correct exact origin `https://frontend.example`.
+
 Workspace and membership: `POST /api/v1/workspaces`, `GET/POST /api/v1/workspaces/:workspaceId/members`.
 
 Tenant resources: `GET/POST /api/v1/workspaces/:workspaceId/clients`, `/projects`, `/contracts`, `/time-entries`, and `/milestones`, plus audit reads at `/audit-events`.

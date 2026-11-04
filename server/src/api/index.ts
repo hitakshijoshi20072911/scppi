@@ -19,6 +19,14 @@ export async function createServer() {
 
   await server.register(helmet, { global: true })
   await server.register(cors, { origin: config.API_CORS_ORIGIN, credentials: true })
+  server.get('/', async (_request, reply) =>
+    reply.send({
+      service: 'vendorproof-api',
+      status: 'ok',
+      version: 'v1',
+      endpoints: { liveness: '/health/live', readiness: '/health/ready' },
+    }),
+  )
   await server.register(healthRoutes)
   await server.register(phase1Routes)
 
