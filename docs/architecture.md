@@ -117,7 +117,7 @@ Every billable line must be supported by either:
 | Logging | pino with redaction | Structured logs with correlation IDs |
 | Tests | Vitest, Playwright, real Postgres in tests | Unit, integration, E2E with real database |
 | LLM | Direct call to one model API with schema-constrained output | Model is a data processor, not a business-API provider |
-| Hosting | Any container host with managed Postgres | Must allow installing the CLI binary and holding `SWYTCHCODE_TOKEN` as a secret |
+| Hosting | Vercel for the Next.js frontend, Render for the long-running Fastify API, Supabase for managed PostgreSQL | Keeps the frontend framework-hosted while the API uses a persistent container and managed Postgres; worker hosting is deferred until durable jobs exist |
 
 ### Architecture Pattern
 
@@ -133,11 +133,12 @@ Every billable line must be supported by either:
 
 ```mermaid
 flowchart LR
-  B[Browser: Lenis frontend] -->|HTTPS, session cookie| API
-  subgraph Host[Container host]
+  B[Browser: Lenis frontend] --> V[Vercel: Next.js frontend]
+  V -->|HTTPS, exact-origin CORS| API
+  subgraph Host[Render container]
     API[API: Fastify routes] --> SVC[Domain services]
-    W[Worker: pg-boss jobs] --> SVC
-    SVC --> DB[(PostgreSQL)]
+    W[Worker: later phase] --> SVC
+    SVC --> DB[(Supabase PostgreSQL)]
     SVC --> ADP[Provider adapters]
     ADP --> EX[Swytchcode executor wrapper]
     EX --> CLI[swytchcode binary + .swytchcode/]

@@ -1,0 +1,5 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build --workspace=@vendorproof/web",
+  "installCommand": "npm ci --include=dev"
+}

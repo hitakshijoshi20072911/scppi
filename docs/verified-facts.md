@@ -262,9 +262,9 @@ c:\swytchcode\
 
 ## Git Status
 
-- **Repository:** Not yet initialised (to be initialised in this bootstrap)
+- **Repository:** Initialized and checked out for Phase 0 work
 - **Remote:** https://github.com/hitakshijoshi20072911/scppi.git
-- **Branch:** main (to be created)
+- **Branch:** `feat/foundation-0`
 
 ## Account Status
 
@@ -274,5 +274,15 @@ c:\swytchcode\
 
 ---
 
-**Document status:** Verified facts recorded. Environment confirmed. Bootstrap in progress.
+**Document status:** Verified facts recorded. Phase 0 foundation and local verification prepared; provider deployment remains manual.
 
+
+
+## Phase 0 environment verification — 2026-11-04
+
+- Node.js available in the sandbox: v22.23.4 during the initial audit; repository requires Node 22.13 or newer.
+- npm available: 10.9.9 during the initial audit.
+- Docker, Docker Compose, `psql`, and Swytchcode CLI were not available in the audit sandbox.
+- A root npm workspace lockfile was generated for the Phase 0 branch. The prior nested `server/package-lock.json` was removed to avoid competing lockfiles.
+- GitHub and Stripe bundles remain downloaded in `.swytchcode/integrations/`; tooling still has no enabled tools and no provider calls were made.
+- Vercel/Render deployment configuration is prepared in `apps/web/vercel.json` and `render.yaml`; no external hosting account was connected or deployed.

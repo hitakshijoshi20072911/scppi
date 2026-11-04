@@ -9,4 +9,4 @@
  * as the API is implemented.
  */
 
-export {}; // Placeholder - types will be added during implementation
+export {} // Placeholder - types will be added during implementation

@@ -129,3 +129,10 @@ Threats marked as "PENDING" are for features not in release one (e.g., Slack int
 ---
 
 **Document status:** Initial threat model created. Mitigations designed. Verification tests pending implementation.
+
+
+## Phase 0 hosting and boundary additions — 2026-11-04
+
+The planned deployment separates the public Next.js frontend on Vercel from the Fastify API and worker on Render. The browser receives only `NEXT_PUBLIC_API_BASE_URL`; database URLs, Swytchcode tokens, provider credentials, and future session secrets remain on Render. Render PostgreSQL is the planned system of record, with migrations run as a controlled release step.
+
+The primary new trust boundary is the Vercel-to-Render API connection. Mitigations are exact-origin CORS, HTTPS, request IDs, safe error bodies, server-side authorization in later phases, and no provider calls from browser code. Remaining risks include missing authentication, missing tenant enforcement, unavailable database verification in the current sandbox, and unverified provider execution.

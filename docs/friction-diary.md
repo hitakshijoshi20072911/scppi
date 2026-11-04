@@ -53,3 +53,14 @@
 ---
 
 **Document status:** Friction diary maintained. No unresolvable issues encountered.
+
+
+## Phase 0 implementation — 2026-11-04
+
+The repository had only a nested server lockfile while CI ran `npm ci` at the root, so clean installation failed. Resolution: the workspace now uses one root `package-lock.json`; the nested lockfile was removed so package manager behavior is unambiguous.
+
+The backend TypeScript include pattern compiled the copied browser-only Lenis monorepo and produced DOM, JSX, React, Vue, and Nuxt errors. Resolution: backend TypeScript now includes only `server/src/**/*.ts` and explicitly excludes `server/src/lenis`; the original source was preserved.
+
+Docker, Docker Compose, and `psql` were unavailable in the sandbox. Resolution: a Docker Compose PostgreSQL setup, Drizzle migration configuration, and exact runbook were added, but database startup and migration execution remain environment-blocked here and must be verified on a machine with Docker or PostgreSQL.
+
+No Vercel or Render account was connected and no external deployment was attempted. Resolution: deployment configuration and manual prerequisites were documented without claiming a deployed URL or creating paid resources.

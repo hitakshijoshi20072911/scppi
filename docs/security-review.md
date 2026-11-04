@@ -2,17 +2,17 @@
 
 **Purpose:** Security review register for findings, remediation, and status.
 
-**Current Status:** NOT YET AUDITED — architecture and control plan documented; implementation findings pending.
+**Current Status:** Phase 0 scoped internal review recorded; no formal or external security audit has been performed.
 
 ---
 
 ## Review Status
 
-**NOT YET AUDITED**
+**Scoped internal review only — not a formal security audit**
 
-This document records the initial security review register. No external audit has been performed. No implementation findings have been recorded yet.
+This register records code and dependency findings from the Phase 0 foundation review. It does not represent penetration testing, a compliance review, or an external audit.
 
-The threat model in `docs/threat-model.md` documents the planned security controls. This document will record actual findings from code reviews, penetration tests, and external audits.
+The threat model in `docs/threat-model.md` documents the planned security controls. Remaining implementation gaps and the dependency finding are listed below.
 
 ---
 
@@ -31,7 +31,7 @@ The threat model in `docs/threat-model.md` documents the planned security contro
 ### Medium
 | ID | Finding | Evidence | Affected files | Severity | Remediation | Regression test | Status |
 |---|---|---|---|---|---|---|---|
-| - | No medium findings yet | - | - | - | - | - | - |
+| DEP-001 | Full workspace audit reports four moderate advisories through Drizzle Kit's deprecated esbuild loader; production dependencies audit clean | `npm audit` after clean install, 2026-11-04 | `package-lock.json`, `server/package.json` | Moderate | Track upstream replacement; do not force a breaking downgrade; review before production build changes | Production audit in CI; rerun full audit after toolchain changes | OPEN (development tooling only) |
 
 ### Low
 | ID | Finding | Evidence | Affected files | Severity | Remediation | Regression test | Status |
@@ -148,3 +148,10 @@ Before production deployment:
 ---
 
 **Document status:** Initial security review register created. No findings yet. External audit pending.
+
+
+## Phase 0 foundation review — 2026-11-04
+
+The Phase 0 implementation adds validated environment configuration, redacted Pino logging, request IDs, exact-origin CORS, Helmet security headers, body-size limits, safe 404/error responses, and backend/frontend separation. These controls are foundation-level only and do not constitute a complete security audit.
+
+Open findings remain: authentication and authorization are not implemented; tenant isolation is documented but not enforced by a database schema; session and CSRF controls are not implemented; provider credentials are not connected; and Swytchcode execution is not implemented. Database startup and migration execution were not testable in the sandbox. The production dependency audit is clean, but the full workspace audit has the moderate development-tool finding above; a dedicated secret scanner and an external security review have not been run.

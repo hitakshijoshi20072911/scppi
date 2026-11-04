@@ -1,63 +1,33 @@
-/**
- * Health and readiness endpoints
- */
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import { checkDatabase } from '../../db/client.js'
+import { config } from '../../platform/config.js'
 
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { logger } from '../../platform/logger.js';
+type DatabaseStatus = 'ready' | 'not_configured' | 'unavailable'
 
-/**
- * Health check - liveness probe
- * Returns 200 if the server process is running
- */
-export async function healthHandler(
-  _request: FastifyRequest,
-  reply: FastifyReply
-) {
-  return reply.status(200).send({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-  });
+export function isDatabaseReady(database: DatabaseStatus, nodeEnv: string) {
+  if (database === 'ready') return true
+  return database === 'not_configured' && nodeEnv !== 'production'
 }
 
-/**
- * Readiness check - readiness probe
- * Returns 200 if all dependencies are ready
- * Returns 503 if any dependency is not ready
- */
-export async function readinessHandler(
-  _request: FastifyRequest,
-  reply: FastifyReply
-) {
-  const checks = {
-    database: 'not_configured', // Will be updated when database is added
-    swytchcode: 'not_configured', // Will be updated when Swytchcode is integrated
-  };
+export async function healthLiveHandler(_request: FastifyRequest, reply: FastifyReply) {
+  return reply.status(200).send({ status: 'ok', timestamp: new Date().toISOString() })
+}
 
-  const allReady = Object.values(checks).every(
-    (status) => status === 'ready'
-  );
+export async function healthReadyHandler(_request: FastifyRequest, reply: FastifyReply) {
+  const database = await checkDatabase()
+  const checks = { database }
+  const ready = isDatabaseReady(database, config.NODE_ENV)
 
-  if (allReady) {
-    return reply.status(200).send({
-      status: 'ready',
-      checks,
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  return reply.status(503).send({
-    status: 'not_ready',
+  return reply.status(ready ? 200 : 503).send({
+    status: ready ? 'ready' : 'not_ready',
     checks,
     timestamp: new Date().toISOString(),
-  });
+  })
 }
 
-/**
- * Register health and readiness routes
- */
 export async function healthRoutes(fastify: FastifyInstance) {
-  fastify.get('/healthz', healthHandler);
-  fastify.get('/readyz', readinessHandler);
-
-  logger.info('Health routes registered');
+  fastify.get('/health/live', healthLiveHandler)
+  fastify.get('/health/ready', healthReadyHandler)
+  fastify.get('/healthz', healthLiveHandler)
+  fastify.get('/readyz', healthReadyHandler)
 }

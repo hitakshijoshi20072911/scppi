@@ -1,0 +1,7 @@
+server/src/lenis/
+server/src/lenis/**
+apps/web/.next/
+apps/web/next-env.d.ts
+apps/web/test-results/
+apps/web/playwright-report/
+node_modules/

@@ -34,6 +34,7 @@
 | D024 | 2026-11-04 | Row-level security as second isolation layer | Defense in depth; catches missing workspace filters | Application-layer filtering only | APPROVED | RLS performance impact unacceptable |
 | D025 | 2026-11-04 | Insert-only audit events with hash chain | Detects tampering; provides audit trail | Mutable audit log, external audit service | APPROVED | Regulatory requirement for specific audit format |
 
+| D026 | 2026-11-04 | Vercel frontend, Render API, Supabase PostgreSQL deployment target | Separates the Next.js frontend from persistent API hosting and managed PostgreSQL while retaining the modular monolith | All services on one host, serverless API, self-hosted database | APPROVED (target only; not deployed) | Provider capability, cost, security, or availability needs change |
 ---
 
 ## Decisions Requiring Approval
