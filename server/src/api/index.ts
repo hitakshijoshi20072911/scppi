@@ -4,8 +4,10 @@ import Fastify, { type FastifyError } from 'fastify'
 import { randomUUID } from 'node:crypto'
 import { config } from '../platform/config.js'
 import { closeDatabase } from '../db/client.js'
+import { authenticate } from '../modules/core.js'
 import { logger } from '../platform/logger.js'
 import { healthRoutes } from './routes/health.js'
+import { phase1Routes } from './routes/phase1.js'
 
 export async function createServer() {
   const server = Fastify({
@@ -18,6 +20,29 @@ export async function createServer() {
   await server.register(helmet, { global: true })
   await server.register(cors, { origin: config.API_CORS_ORIGIN, credentials: true })
   await server.register(healthRoutes)
+  await server.register(phase1Routes)
+
+  server.addHook('onRequest', async (request) => {
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return
+    const origin = request.headers.origin
+    if (origin && origin !== config.API_CORS_ORIGIN) {
+      const error = new Error('Origin is not allowed')
+      Object.assign(error, { statusCode: 403, code: 'FORBIDDEN_ORIGIN' })
+      throw error
+    }
+    if (
+      request.url.startsWith('/api/v1/auth/register') ||
+      request.url.startsWith('/api/v1/auth/login')
+    )
+      return
+    const auth = await authenticate(request)
+    const csrf = request.headers['x-csrf-token']
+    if (auth && csrf !== auth.csrfToken) {
+      const error = new Error('CSRF validation failed')
+      Object.assign(error, { statusCode: 403, code: 'CSRF_INVALID' })
+      throw error
+    }
+  })
 
   server.addHook('onSend', async (request, reply) => {
     reply.header('x-request-id', request.id)
