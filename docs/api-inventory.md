@@ -25,8 +25,8 @@ A provider only counts at the highest rung actually reached.
 
 | Provider | Business purpose | Verification level | Canonical ID | Input schema | Output schema | Authentication | Test evidence |
 |---|---|---|---|---|---|---|---|
-| GitHub | PR and commit evidence (read) | Catalogue mention only | - | - | - | - | - |
-| Stripe | Draft invoice (write) | Catalogue mention only | - | - | - | - | - |
+| GitHub | PR and commit evidence (read) | Rung 5 (Canonical IDs and schemas verified) | github.pull.get, github.pull.commits.get | See Wrekenfile | See Wrekenfile | oauth2 | Not yet (no auth connected) |
+| Stripe | Draft invoice (write) | Rung 5 (Canonical IDs and schemas verified) | stripe.invoice.create, stripe.invoice.get | See Wrekenfile | See Wrekenfile | api_key | Not yet (no auth connected) |
 | Google Drive | Private copy of audit report (write) | None | - | - | - | - | - |
 | Slack | Approval-needed notification (write) | Catalogue mention only | - | - | - | - | - |
 | Linear | Ticket scope (read) | None | - | - | - | - | - |
@@ -41,20 +41,40 @@ A provider only counts at the highest rung actually reached.
 
 **Purpose:** Read pull requests, commits, and work evidence.
 
-**Verification level:** Catalogue mention only
+**Verification level:** Rung 5 (Canonical IDs and schemas verified)
+
+**Integration version:** GitHub@1.1.4
+
+**Wrekenfile path:** `.swytchcode/integrations/GitHub/github/1.1.4/wrekenfile.yaml`
+
+**Evidence copy:** `docs/evidence/swytchcode/github/wrekenfile.yaml`
+
+**Verified canonical IDs:**
+- `github.pull.get` - List pull requests for a repository
+- `github.pull.commits.get` - List commits for a specific pull request
+- `github.pull.get1` - Get details for a specific pull request
+- `github.commit.get2` - Get a specific commit by owner, repo, and ref
+
+**Input schema:** See Wrekenfile (large file, full schema not displayed here)
+
+**Output schema:** See Wrekenfile (large file, full schema not displayed here)
+
+**Read/write:** Read
+
+**Authentication:** oauth2 (GitHub OAuth2)
+
+**Sandbox/test support:** GitHub does not have a separate sandbox mode; uses test repositories
 
 **Operations needed (descriptive, not method names):**
 - List PRs for a repo with pagination
 - Read one PR
 - Read its commits
 
-**Read/write:** Read
-
 **Risk:** Repo content and private code metadata; import only title, state, author, timestamps, URL
 
 **Failure behaviour:** Partial run (R8); retry reads; never fall through to direct calls
 
-**Status:** Needs verification at Milestone 2
+**Status:** Canonical IDs and schemas verified. Authentication not yet connected. Sandbox execution not yet verified.
 
 ---
 
@@ -62,7 +82,35 @@ A provider only counts at the highest rung actually reached.
 
 **Purpose:** Draft invoice creation in test mode.
 
-**Verification level:** Catalogue mention only
+**Verification level:** Rung 5 (Canonical IDs and schemas verified)
+
+**Integration version:** Stripe@2026-06-24.dahlia
+
+**Wrekenfile path:** `.swytchcode/integrations/Stripe/stripe/2026-06-24.dahlia/wrekenfile.yaml`
+
+**Evidence copy:** `docs/evidence/swytchcode/stripe/wrekenfile.yaml`
+
+**Verified canonical IDs:**
+- `stripe.invoice.create` - Create a draft invoice for a customer
+- `stripe.invoice.get` - Get an invoice by its ID
+- `stripe.invoice.list` - Get a list of invoices, optionally filtered by customer or date
+- `stripe.invoiceitem.create` - Add an item to an invoice or the next invoice for a customer
+- `stripe.invoiceitem.get` - Get a specific invoice item by its ID
+- `stripe.invoiceitem.list` - Retrieve a list of invoice items
+- `stripe.customer.create1` - Create a customer
+- `stripe.customer.get` - Retrieve a customer
+
+**Input schema:** See Wrekenfile (large file, full schema not displayed here)
+
+**Output schema:** See Wrekenfile (large file, full schema not displayed here)
+
+**Read/write:** Write plus read
+
+**Authentication:** api_key (Stripe API key)
+
+**Sandbox/test support:** Stripe has test mode with test keys (sk_test_ prefix)
+
+**Idempotency mechanism:** Stripe supports idempotency keys (to be verified in execution)
 
 **Operations needed (descriptive, not method names):**
 - Find or create customer
@@ -71,13 +119,11 @@ A provider only counts at the highest rung actually reached.
 - Read it back
 - Find by metadata
 
-**Read/write:** Write plus read
-
 **Risk:** Real money object, even in test mode
 
 **Failure behaviour:** Unknown outcome stops in `draft_unknown`; never resend
 
-**Status:** Preferred financial candidate; needs verification at Milestone 2
+**Status:** Canonical IDs and schemas verified. Authentication not yet connected. Sandbox execution not yet verified. Idempotency mechanism to be verified during execution.
 
 ---
 

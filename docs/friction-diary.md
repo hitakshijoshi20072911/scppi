@@ -20,6 +20,11 @@
 | 2026-11-04 20:00 | Shared package | Created packages/shared/package.json and src/index.ts | Shared package scaffold created | Files created successfully | None required | SUCCESS |
 | 2026-11-04 20:00 | Documentation system | Created 13 documentation files | Comprehensive documentation created | All files created successfully | None required | SUCCESS |
 | 2026-11-04 20:00 | Updated verified-facts.md | Replaced generic Swytchcode content with VendorProof-specific information | VendorProof facts recorded | File updated successfully | None required | SUCCESS |
+| 2026-11-04 20:35 | Provider search timeout | swy search github, swy search stripe | Registry search results | Context deadline exceeded (network timeout) | Retried search, then proceeded with direct get | SUCCESS (get succeeded) |
+| 2026-11-04 20:35 | GitHub integration download | swy get github | Download GitHub integration bundle | Saved GitHub/github@1.1.4 | None required | SUCCESS |
+| 2026-11-04 20:35 | Stripe integration download | swy get stripe | Download Stripe integration bundle | Saved Stripe/stripe@2026-06-24.dahlia | None required | SUCCESS |
+| 2026-11-04 20:36 | Method schema inspection | swy info for github.pull.get, github.pull.commits.get, stripe.invoice.create, stripe.invoice.get | Verify canonical IDs and schemas | Schemas verified (large files truncated in output) | None required | SUCCESS |
+| 2026-11-04 20:37 | Wrekenfile evidence copy | Copy Wrekenfiles to docs/evidence/swytchcode/ | Preserve evidence for assignment submission | Files copied successfully | PowerShell mkdir/copy syntax differences | SUCCESS |
 
 ---
 

@@ -87,23 +87,29 @@
 
 ## Current Integrations
 
-- **Installed:** None
+- **Installed:** GitHub@1.1.4, Stripe@2026-06-24.dahlia
 - **Enabled tools:** None
 - **Connected provider accounts:** None
 
 ## Provider Verification Status
 
 ### GitHub
-- **Verification level:** Catalogue mention only
-- **Methods verified:** None
-- **Canonical IDs:** None
-- **Schemas:** None
+- **Verification level:** Rung 5 (Canonical IDs and schemas verified)
+- **Integration version:** GitHub@1.1.4
+- **Methods verified:** github.pull.get, github.pull.commits.get, github.pull.get1, github.commit.get2
+- **Canonical IDs:** Verified (see docs/api-inventory.md)
+- **Schemas:** Verified (see docs/api-inventory.md and docs/evidence/swytchcode/github/wrekenfile.yaml)
+- **Authentication:** oauth2 (not connected)
+- **Sandbox execution:** Not yet verified
 
 ### Stripe
-- **Verification level:** Catalogue mention only
-- **Methods verified:** None
-- **Canonical IDs:** None
-- **Schemas:** None
+- **Verification level:** Rung 5 (Canonical IDs and schemas verified)
+- **Integration version:** Stripe@2026-06-24.dahlia
+- **Methods verified:** stripe.invoice.create, stripe.invoice.get, stripe.invoice.list, stripe.invoiceitem.create, stripe.invoiceitem.get, stripe.invoiceitem.list, stripe.customer.create1, stripe.customer.get
+- **Canonical IDs:** Verified (see docs/api-inventory.md)
+- **Schemas:** Verified (see docs/api-inventory.md and docs/evidence/swytchcode/stripe/wrekenfile.yaml)
+- **Authentication:** api_key (not connected)
+- **Sandbox execution:** Not yet verified
 
 ### Other Providers
 - **Google Drive:** None
@@ -136,6 +142,32 @@ See `docs/api-inventory.md` for detailed provider matrix.
 - Playwright: https://playwright.dev/
 
 ## CLI Commands and Outputs
+
+### Integration Download (2026-11-04 20:35)
+```powershell
+swy get stripe
+# Output: saved Stripe/stripe@2026-06-24.dahlia
+#          saved 1 bundles for provider "Stripe"
+
+swy get github
+# Output: saved GitHub/github@1.1.4
+#          saved 1 bundles for provider "GitHub"
+```
+
+### Method Inspection (2026-11-04 20:36)
+```powershell
+swy info github.pull.get
+# Output: Schema verified (665 lines truncated)
+
+swy info github.pull.commits.get
+# Output: Schema verified (285 lines truncated)
+
+swy info stripe.invoice.create
+# Output: Schema verified (504 lines truncated)
+
+swy info stripe.invoice.get
+# Output: Schema verified (503 lines truncated)
+```
 
 ### Environment Diagnostics (2026-11-04)
 ```powershell
