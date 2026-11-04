@@ -1,47 +1,98 @@
-# Dependencies
+# ============================================================
+# Dependencies and package-manager caches
+# Keep lockfiles (package-lock.json, pnpm-lock.yaml, yarn.lock)
+# tracked so installs are reproducible.
+# ============================================================
 node_modules/
-package-lock.json
+.pnp.*
+.pnpm-store/
+.yarn/cache/
 
-# Build output
+# ============================================================
+# Build output and generated artifacts
+# ============================================================
 dist/
 build/
+.next/
+out/
+.vercel/
+.netlify/
 *.tsbuildinfo
 
-# Coverage
+# ============================================================
+# Test output and coverage
+# ============================================================
 coverage/
 .nyc_output/
+.vitest/
+playwright-report/
+playwright/.cache/
 
+# ============================================================
 # Credentials and secrets
+# Never commit real credentials, even temporarily. Git history keeps
+# previous versions after a file is deleted from the latest commit.
+# Example/template files remain trackable.
+# ============================================================
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!.env.template
+!.env.sample
+!**/.env.example
+!**/.env.template
+!**/.env.sample
 *.key
 *.pem
-.env
-.env.local
-.env.*.local
+*.p12
+*.pfx
 *.secret
+*.secrets
+*.token
+secrets.json
+secrets.yaml
+secrets.yml
+**/service-account*.json
+**/*credentials*.json
+**/*private-key*.*
 
-# Swytchcode generated files (can be reconstructed with swy bootstrap)
-.swytchcode/integrations/*/wrekenfile.yaml
-.swytchcode/integrations/*/methods.json
-.swytchcode/integrations/*/policies.json
-
-# Swytchcode local state
-.swytchcode/integrations/manifest.json
+# ============================================================
+# Swytchcode: intentionally TRACK useful integration definitions
+# No ignore rule is applied to .swytchcode/integrations/ so that
+# Wrekenfiles, methods.json, workflows.json, policies.json and
+# manifest.json can be reviewed and committed to this repository.
+# Keep only machine-local state and backups out of Git.
+# ============================================================
+.swytchcode/workspace.json
 .swytchcode/tooling.json.lock
 .swytchcode/mcp.pid
-
-# Swytchcode backups
 .swytchcode/tooling.json.backup
 *.backup
 
-# Temporary source material (architecture input)
-_planning-input/
+# ============================================================
+# Temporary files and local caches
+# _planning-input/ is intentionally NOT ignored: retain valuable
+# source/architecture material unless it contains sensitive data.
+# ============================================================
+.cache/
+.turbo/
+.eslintcache
+tmp/
+temp/
+*.tmp
 
-# OS files
+# ============================================================
+# Operating-system files
+# ============================================================
 Thumbs.db
 Desktop.ini
 .DS_Store
 
-# IDE
+# ============================================================
+# IDE and editor-local files
+# ============================================================
 .vscode/
 .idea/
 *.swp
@@ -51,19 +102,11 @@ Desktop.ini
 .classpath
 .settings/
 
+# ============================================================
 # Logs
+# ============================================================
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# Testing
-.vitest/
-playwright-report/
-playwright/.cache/
-
-# Temporary files
-tmp/
-temp/
-*.tmp
