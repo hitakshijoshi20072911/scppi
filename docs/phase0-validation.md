@@ -1,7 +1,7 @@
 # Phase 0 Validation Record
 
 **Run date:** 2026-11-04
-**Environment:** Manus sandbox, Node.js v22.23.4, npm workspace; the validated code tree is being pushed on `feat/foundation-0`.
+**Environment:** Manus sandbox, Node.js v22.23.4, npm workspace; validated code was pushed to `feat/foundation-0` at commit `a34c445`.
 
 ## Passed checks
 
@@ -33,7 +33,7 @@ The full workspace audit reports four **moderate** findings, all rooted in Drizz
 
 There is no PostgreSQL integration-test suite yet; the broken integration-test script reference was removed until a real database harness and tests are implemented. Product workflows, authentication, authorization, tenant isolation/RLS, provider sandbox calls, durable worker jobs, and financial operations are also not implemented or tested.
 
-No Vercel, Render, or Supabase service was created. The GitHub Actions workflow was validated locally through equivalent commands but has not run on GitHub. No dedicated secret scanner, penetration test, external audit, or production smoke test was run.
+No Vercel, Render, or Supabase service was created. GitHub Actions CI passed for the code commit ([run 41879194336](https://github.com/hitakshijoshi20072911/scppi/actions/runs/41879194336)). No dedicated secret scanner, penetration test, external audit, or production smoke test was run.
 
 ## Readiness conclusion
 
