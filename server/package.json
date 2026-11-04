@@ -1,0 +1,40 @@
+{
+  "name": "@vendorproof/server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "VendorProof backend API and worker",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "dev:api": "tsx watch src/api/index.ts",
+    "dev:worker": "tsx watch src/worker/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start:api": "node dist/api/index.js",
+    "start:worker": "node dist/worker/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest",
+    "test:unit": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "fastify": "^5.2.0",
+    "@fastify/cors": "^9.0.1",
+    "pino": "^9.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3",
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.4",
+    "eslint": "^9.14.0",
+    "@typescript-eslint/eslint-plugin": "^8.13.0",
+    "@typescript-eslint/parser": "^8.13.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

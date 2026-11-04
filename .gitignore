@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Credentials and secrets
+*.key
+*.pem
+.env
+.env.local
+.env.*.local
+*.secret
+
+# Swytchcode generated files (can be reconstructed with swy bootstrap)
+.swytchcode/integrations/*/wrekenfile.yaml
+.swytchcode/integrations/*/methods.json
+.swytchcode/integrations/*/policies.json
+
+# Swytchcode local state
+.swytchcode/integrations/manifest.json
+.swytchcode/tooling.json.lock
+.swytchcode/mcp.pid
+
+# Swytchcode backups
+.swytchcode/tooling.json.backup
+*.backup
+
+# Temporary source material (architecture input)
+_planning-input/
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+.vitest/
+playwright-report/
+playwright/.cache/
+
+# Temporary files
+tmp/
+temp/
+*.tmp

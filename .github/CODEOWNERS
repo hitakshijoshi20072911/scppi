@@ -1,0 +1,23 @@
+# Code Owners for VendorProof
+
+# Swytchcode configuration changes require approval
+.swytchcode/tooling.json @hitakshijoshi20072911
+.swytchcode/integrations/ @hitakshijoshi20072911
+
+# API inventory changes require approval
+docs/api-inventory.md @hitakshijoshi20072911
+
+# Security changes require approval
+docs/security-review.md @hitakshijoshi20072911
+docs/threat-model.md @hitakshijoshi20072911
+
+# Architecture changes require approval
+docs/architecture.md @hitakshijoshi20072911
+docs/decisions.md @hitakshijoshi20072911
+
+# Engineering rules require approval
+rules.md @hitakshijoshi20072911
+AGENTS.md @hitakshijoshi20072911
+
+# Production changes require approval
+docs/production.md @hitakshijoshi20072911
