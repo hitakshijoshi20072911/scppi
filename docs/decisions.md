@@ -35,6 +35,8 @@
 | D025 | 2026-11-04 | Insert-only audit events with hash chain | Detects tampering; provides audit trail | Mutable audit log, external audit service | APPROVED | Regulatory requirement for specific audit format |
 
 | D026 | 2026-11-04 | Vercel frontend, Render API, Supabase PostgreSQL deployment target | Separates the Next.js frontend from persistent API hosting and managed PostgreSQL while retaining the modular monolith | All services on one host, serverless API, self-hosted database | APPROVED (target only; not deployed) | Provider capability, cost, security, or availability needs change |
+| D027 | 2026-11-04 | Phase 1 uses application-managed opaque sessions and scrypt password hashes | Keeps sessions revocable in PostgreSQL and uses Node's maintained, memory-hard password primitive without custom cryptography | JWT-only sessions, plaintext credentials, unmaintained auth package | APPROVED | Supabase Auth is explicitly adopted or a dedicated maintained auth library is selected |
+| D028 | 2026-11-04 | Committed SQL migrations are applied by a small tracked migration runner | The bootstrap Drizzle journal was empty while the repository already contained a baseline SQL file; applying sorted, recorded SQL files preserves reviewability and clean-database execution | Ignoring existing SQL, manually editing applied migrations, speculative ORM generation | APPROVED | Drizzle metadata is regenerated from the complete Phase 1 schema |
 ---
 
 ## Decisions Requiring Approval

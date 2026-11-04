@@ -6,7 +6,7 @@ VendorProof is a work-to-invoice reconciliation platform for technical freelance
 
 ## Current status
 
-Phase 0 foundation is prepared on `feat/foundation-0`. The current implementation includes:
+Phase 1 foundation is implemented on `feat/foundation-0`. The current implementation includes:
 
 - A Fastify API foundation with request IDs, safe errors, exact-origin CORS, security headers, and health endpoints.
 - A minimal Next.js frontend shell intended for Vercel.
@@ -15,8 +15,9 @@ Phase 0 foundation is prepared on `feat/foundation-0`. The current implementatio
 - Vitest backend unit tests, a Playwright browser smoke test, ESLint, Prettier, TypeScript checks, and GitHub Actions CI.
 - A Render Blueprint for the API web service. Supabase is the planned database host; the Blueprint does not create a database or background worker.
 - Preserved Lenis source under `server/src/lenis`; it is excluded from backend compilation and must be integrated into `apps/web` only in the approved frontend phase.
+- PostgreSQL-backed authentication, revocable sessions, users, workspaces, memberships, role permissions, clients, projects, contracts, human-entered time entries, fixed-price milestones, and append-only audit events.
 
-No production service has been deployed. Authentication, business data models, tenant RLS, provider execution, real worker jobs, and invoice workflows are not implemented. No GitHub or Stripe provider calls or financial operations are part of Phase 0.
+No production service has been deployed. Provider execution, tenant RLS, real worker jobs, reconciliation, and invoice workflows remain deferred. No GitHub or Stripe provider calls or financial operations are part of Phase 1.
 
 ## Architecture
 
@@ -45,7 +46,7 @@ The application remains a modular monolith. API and future worker processes shar
 
 ## Prerequisites
 
-- Node.js 22.13 or newer.
+- Node.js 22.23.4 (see `.node-version`).
 - npm 10 or newer.
 - Docker for the easiest local PostgreSQL setup, or another PostgreSQL instance.
 - Git.
@@ -86,6 +87,7 @@ npm run test:unit
 npm run test:e2e
 npm run build
 npm run db:check
+npm run db:migrate
 npm audit --omit=dev --audit-level=high
 ```
 

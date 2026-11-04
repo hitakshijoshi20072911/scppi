@@ -9,6 +9,7 @@
     "server"
   ],
   "scripts": {
+    "start:api": "npm run start:api --workspace=@vendorproof/server",
     "dev": "concurrently -k -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
     "dev:api": "npm run dev --workspace=@vendorproof/server",
     "dev:web": "npm run dev --workspace=@vendorproof/web",
@@ -29,7 +30,7 @@
     "db:check": "npm run db:check --workspace=@vendorproof/server"
   },
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.23.4 <23"
   },
   "overrides": {
     "minimatch": "^11.0.1"
