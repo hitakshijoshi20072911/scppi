@@ -2,6 +2,10 @@
 
 **Purpose:** Define testing approach, levels, and quality gates.
 
+## Phase 0 coverage status
+
+Phase 0 currently implements four Fastify health tests and one Playwright frontend smoke test. The CI workflow also runs formatting, lint, type checks, builds, a Drizzle metadata check, and a production-dependency audit. PostgreSQL integration tests, business-flow E2E tests, provider sandbox tests, and production smoke tests are not implemented and must not be reported as passing. The integration script is intentionally absent until a real PostgreSQL test harness is added.
+
 ---
 
 ## Test Levels
@@ -78,6 +82,8 @@ Ties round up. Rate is in minor units.
 - **Framework:** Vitest
 - **Database:** Real PostgreSQL (test database)
 - **Migrations:** Run migrations up and down in tests
+
+**Phase 0 status:** Planned, not implemented. No integration configuration or live PostgreSQL test database is present yet.
 
 ### Guidelines
 - Use real PostgreSQL, not mocks
@@ -208,17 +214,13 @@ Create client; add project with contract and scope rules; connect a test reposit
 
 ## Quality Gates in CI
 
-### Required Checks
-- Type check (`npm run typecheck`)
-- Lint (`npm run lint`)
-- Unit tests (`npm run test:unit`)
-- Integration tests (`npm run test:integration`)
-- Migration up on empty database (`npm run db:migrate`)
-- Migration up on previous schema (`npm run db:migrate`)
-- Build (`npm run build`)
-- Dependency audit (`npm audit`)
-- Secret scan (pre-commit hook and CI)
-- Check that no source file imports the executor outside `src/providers`
+### Current Phase 0 checks
+
+The executable CI checks are defined in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml): format, lint, type check, unit tests, Playwright smoke test, build, `npm run db:check`, and `npm audit --omit=dev --audit-level=high`.
+
+### Planned checks for later phases
+
+Add real PostgreSQL integration and migration tests when the first business schema and repository code are implemented. Add contract and sandbox tests only after the associated provider methods are verified. Add production smoke tests only after a production environment exists. Do not make successful no-DB checks stand in for those test levels.
 
 ### Gate Rules
 - A pull request cannot merge with any gate red
@@ -282,4 +284,4 @@ Create client; add project with contract and scope rules; connect a test reposit
 
 ---
 
-**Document status:** Testing strategy documented. Tests to be implemented during development milestones.
+**Document status:** Phase 0 unit and browser smoke tests exist; the later-phase integration, contract, sandbox, security-abuse, and production test suites remain planned.

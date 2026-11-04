@@ -2,154 +2,112 @@
 
 **Verified work. Traceable invoices.**
 
-VendorProof is a deliverable reconciliation and invoice preparation platform for technical freelancers, consultants, fractional CTOs, and small software agencies.
+VendorProof is a work-to-invoice reconciliation platform for technical freelancers and software agencies. It is intended to connect engineering delivery evidence with human-approved time records or fixed-price milestones so future invoice lines can be reviewed and traced.
 
-It connects software development activity, contractual scope, approved billing evidence, and financial systems into an auditable reconciliation workflow.
+## Current status
 
----
+Phase 0 foundation is prepared on `feat/foundation-0`. The current implementation includes:
 
-## Status
+- A Fastify API foundation with request IDs, safe errors, exact-origin CORS, security headers, and health endpoints.
+- A minimal Next.js frontend shell intended for Vercel.
+- PostgreSQL/Drizzle migration scaffolding with a Phase 0 connectivity sentinel only.
+- A root npm workspace with one authoritative `package-lock.json`.
+- Vitest backend unit tests, a Playwright browser smoke test, ESLint, Prettier, TypeScript checks, and GitHub Actions CI.
+- A Render Blueprint for the API web service. Supabase is the planned database host; the Blueprint does not create a database or background worker.
+- Preserved Lenis source under `server/src/lenis`; it is excluded from backend compilation and must be integrated into `apps/web` only in the approved frontend phase.
 
-**Architecture Initialised** - This is the initial repository bootstrap. The application is not yet built.
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- Node.js v22 or higher
-- npm 10 or higher
-- Swytchcode CLI 2.25.1 or higher
-
-### Installation
-
-```bash
-npm install
-```
-
-### Development
-
-```bash
-# Start API server
-npm run dev:api
-
-# Start worker
-npm run dev:worker
-
-# Run tests
-npm run test
-
-# Type check
-npm run typecheck
-
-# Lint
-npm run lint
-
-# Build
-npm run build
-```
-
----
+No production service has been deployed. Authentication, business data models, tenant RLS, provider execution, real worker jobs, and invoice workflows are not implemented. No GitHub or Stripe provider calls or financial operations are part of Phase 0.
 
 ## Architecture
 
-VendorProof uses a modular monolith architecture with:
+```text
+Vercel: apps/web (Next.js)
+        │ HTTPS / exact CORS origin
+        ▼
+Render: Fastify API (server)
+        │ DATABASE_URL secret
+        ▼
+Supabase: PostgreSQL
 
-- **TypeScript** with strict mode
-- **Fastify** for the backend API
-- **PostgreSQL** as the system of record
-- **Drizzle ORM** and SQL migrations
-- **Zod** for validation
-- **pg-boss** for persistent background jobs
-- **PDFKit** for report generation
-- **Pino** for structured logging
-- **Vitest** for unit and integration tests
-- **Playwright** for browser-level testing
-
-See [docs/architecture.md](docs/architecture.md) for complete architecture documentation.
-
----
-
-## Documentation
-
-- [docs/architecture.md](docs/architecture.md) - Complete system architecture
-- [docs/api-inventory.md](docs/api-inventory.md) - Provider method verification register
-- [docs/decisions.md](docs/decisions.md) - Architectural decision register
-- [docs/tradeoffs-considered.md](docs/tradeoffs-considered.md) - Trade-off documentation
-- [docs/production.md](docs/production.md) - Production runbook
-- [docs/threat-model.md](docs/threat-model.md) - Threat model
-- [docs/security-review.md](docs/security-review.md) - Security review register
-- [docs/performance-review.md](docs/performance-review.md) - Performance review
-- [docs/testing-strategy.md](docs/testing-strategy.md) - Testing strategy
-- [docs/verified-facts.md](docs/verified-facts.md) - Verified environment facts
-- [docs/friction-diary.md](docs/friction-diary.md) - Development friction log
-- [rules.md](rules.md) - Engineering rulebook (read before making changes)
-- [AGENTS.md](AGENTS.md) - Instructions for AI coding agents
-
----
-
-## Project Structure
-
-```
-vendorproof/
-├── apps/web/          # Frontend (Lenis scrolling - to be integrated)
-├── server/            # Backend API and worker
-│   ├── src/
-│   │   ├── api/       # API routes
-│   │   ├── platform/  # Config, logger, errors
-│   │   ├── db/        # Database (to be implemented)
-│   │   ├── auth/      # Authentication (to be implemented)
-│   │   ├── domain/    # Domain services (to be implemented)
-│   │   ├── providers/ # Provider adapters (to be implemented)
-│   │   ├── swytchcode/ # Swytchcode executor (to be implemented)
-│   │   └── jobs/      # Background jobs (to be implemented)
-│   └── tests/
-├── packages/shared/   # Shared types and validation
-├── docs/              # Documentation
-└── .swytchcode/       # Swytchcode configuration
+Render background worker: deferred until durable jobs are implemented
 ```
 
----
+The application remains a modular monolith. API and future worker processes share one TypeScript codebase and the PostgreSQL database. Provider calls will be added later behind a server-side Swytchcode executor. The frontend never holds provider credentials or calls providers directly.
 
-## Swytchcode Integration
+## Repository structure
 
-This project uses Swytchcode for external API execution. The project is configured in sandbox mode.
+- `apps/web/` — Next.js frontend foundation.
+- `server/` — Fastify API, future worker entrypoint, Drizzle config, and migrations.
+- `packages/shared/` — shared validation contracts and types.
+- `docs/` — architecture, deployment, security, operations, testing, and roadmap documentation.
+- `server/src/lenis/` — preserved browser-only Lenis source; not backend runtime code.
+- `.swytchcode/` — downloaded provider definitions and sandbox configuration; no provider tools are enabled in Phase 0.
 
-**Important:** No provider integrations have been downloaded yet. Integrations will be added after the product idea is finalised and providers are verified.
+## Prerequisites
 
-See [docs/api-inventory.md](docs/api-inventory.md) for the current verification status of providers.
+- Node.js 22.13 or newer.
+- npm 10 or newer.
+- Docker for the easiest local PostgreSQL setup, or another PostgreSQL instance.
+- Git.
 
----
+Swytchcode CLI and provider authentication are not required for Phase 0.
 
-## Engineering Rules
+## Local development
 
-**Before making changes, read [rules.md](rules.md).**
+```bash
+cp .env.example .env
+npm ci
+```
 
-All AI coding agents (Manus, Windsurf, Claude) must read the engineering rulebook before making any changes.
+If Docker is available:
 
----
+```bash
+docker compose up -d postgres
+# Set DATABASE_URL in the ignored .env file to your local database.
+npm run db:migrate
+```
 
-## Current Limitations
+Start the services in separate terminals:
 
-- No actual product integrations yet
-- No Wrekenfiles yet
-- No provider credentials connected
-- No invoice functionality yet
-- No production deployment yet
-- No completed security audit yet
-- No completed performance audit yet
-- Frontend integration pending the Lenis source
+```bash
+npm run dev:api
+npm run dev:web
+```
 
----
+Open `http://localhost:3001`. Check `http://localhost:3000/health/live` and `http://localhost:3000/health/ready`.
 
-## License
+## Quality commands
 
-To be determined.
+```bash
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test:unit
+npm run test:e2e
+npm run build
+npm run db:check
+npm audit --omit=dev --audit-level=high
+```
 
----
+The E2E test requires Playwright Chromium; install it with `npx playwright install chromium` if needed. `db:check` is a static Drizzle migration check; it does not test a live database. The Phase 0 migration creates a connectivity sentinel, not the product schema.
 
-## Contributing
+See [`docs/phase0-validation.md`](docs/phase0-validation.md) for the latest executed checks and their limits.
 
-To be determined.
+## Deployment
 
+The planned deployment is Vercel for `apps/web`, Render for the Fastify API, and Supabase for PostgreSQL. No provider service has been created by this repository work. Follow [`docs/deployment.md`](docs/deployment.md), [`docs/production-setup.md`](docs/production-setup.md), [`docs/production.md`](docs/production.md), and [`docs/operations/runbook.md`](docs/operations/runbook.md).
+
+For Vercel, set Root Directory to `apps/web` and configure `NEXT_PUBLIC_API_BASE_URL` separately for Preview and Production. For Render, use the reviewed `render.yaml`, set `API_CORS_ORIGIN` to the exact frontend origin, and store the Supabase `DATABASE_URL` as a secret. Do not put database, Swytchcode, Stripe, GitHub, or session credentials in frontend variables.
+
+## Product and security rules
+
+- GitHub activity is evidence of engineering activity, not proof of hours.
+- Hours come from human-entered and approved time records.
+- Fixed-price amounts come from explicit milestone records.
+- Money is calculated deterministically in integer minor units.
+- AI may suggest classifications or descriptions but cannot invent hours or money.
+- Human approval precedes financial actions.
+- Release-one financial scope is draft invoice creation only; no sending, finalization, charges, refunds, or payouts.
+- Tenant isolation and authorization are server responsibilities.
+
+See [`rules.md`](rules.md), [`docs/threat-model.md`](docs/threat-model.md), and [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md).

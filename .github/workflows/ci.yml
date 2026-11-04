@@ -2,49 +2,48 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feat/**']
   pull_request:
     branches: [main]
 
 jobs:
   quality:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-
       - name: Install dependencies
         run: npm ci
-
-      - name: Type check
-        run: npm run typecheck
-
+      - name: Format check
+        run: npm run format:check
       - name: Lint
         run: npm run lint
-
-      - name: Test
-        run: npm run test
-
+      - name: Type check
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser smoke test
+        run: npm run test:e2e
       - name: Build
         run: npm run build
-
+      - name: Migration metadata check
+        run: npm run db:check
       - name: Dependency audit
-        run: npm audit
-
+        run: npm audit --omit=dev --audit-level=high
       - name: Check Swytchcode tooling changes
         run: |
-          if git diff --name-only HEAD~1 HEAD | grep -q '.swytchcode/tooling.json'; then
-            if git diff --name-only HEAD~1 HEAD | grep -q 'docs/api-inventory.md'; then
-              echo "Swytchcode tooling changed with api-inventory update - OK"
-            else
-              echo "ERROR: Swytchcode tooling changed without api-inventory update"
-              exit 1
-            fi
+          if git diff --name-only origin/main...HEAD | grep -Eq '^\.swytchcode/(tooling\.json|integrations/manifest\.json|policies\.json)'; then
+            git diff --name-only origin/main...HEAD | grep -q '^docs/api-inventory.md$' || {
+              echo "Swytchcode configuration changed without docs/api-inventory.md"; exit 1;
+            }
           fi

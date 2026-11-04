@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: vendorproof-api
+    runtime: node
+    plan: free # Smoke-test only; select an appropriate paid plan before production.
+    branch: feat/foundation-0
+    buildCommand: npm ci --include=dev && npm run build:server
+    startCommand: npm run start:api
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: API_CORS_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: LOG_LEVEL
+        value: info

@@ -25,6 +25,7 @@ out/
 coverage/
 .nyc_output/
 .vitest/
+apps/web/test-results/
 playwright-report/
 playwright/.cache/
 

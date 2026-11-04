@@ -4,17 +4,41 @@
   "private": true,
   "description": "VendorProof - Verified work. Traceable invoices.",
   "workspaces": [
+    "apps/*",
     "packages/*",
     "server"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=server",
-    "build": "npm run build --workspace=server",
-    "typecheck": "npm run typecheck --workspace=server",
-    "lint": "npm run lint --workspace=server",
-    "test": "npm run test --workspace=server"
+    "dev": "concurrently -k -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run dev --workspace=@vendorproof/server",
+    "dev:web": "npm run dev --workspace=@vendorproof/web",
+    "dev:worker": "npm run dev:worker --workspace=@vendorproof/server",
+    "build": "npm run build:server && npm run build:web",
+    "build:server": "npm run build --workspace=@vendorproof/server",
+    "build:web": "npm run build --workspace=@vendorproof/web",
+    "typecheck": "npm run typecheck:server && npm run typecheck:web",
+    "typecheck:server": "npm run typecheck --workspace=@vendorproof/server",
+    "typecheck:web": "npm run typecheck --workspace=@vendorproof/web",
+    "lint": "eslint server/src apps/web packages/shared --ext .ts,.tsx",
+    "format:check": "prettier --check \"server/src/**/*.{ts,tsx}\" \"server/tests/**/*.{ts,tsx}\" \"apps/web/**/*.{ts,tsx,css,json}\" \"packages/shared/**/*.{ts,tsx}\"",
+    "test": "npm run test:unit",
+    "test:unit": "npm run test:unit --workspace=@vendorproof/server",
+    "test:e2e": "npm run test:e2e --workspace=@vendorproof/web",
+    "db:generate": "npm run db:generate --workspace=@vendorproof/server",
+    "db:migrate": "npm run db:migrate --workspace=@vendorproof/server",
+    "db:check": "npm run db:check --workspace=@vendorproof/server"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.13.0"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.72.1",
+    "@typescript-eslint/parser": "^8.72.1",
+    "concurrently": "^9.1.0",
+    "eslint": "^10.14.0",
+    "prettier": "^3.3.3"
   }
 }
