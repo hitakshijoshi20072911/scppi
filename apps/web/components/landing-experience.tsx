@@ -5,12 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { demoPullRequests, demoSteps } from '@/lib/demo-data'
-
+import { getApiBaseUrl } from '@/lib/api'
 gsap.registerPlugin(ScrollTrigger)
-const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000').replace(
-  /\/$/,
-  '',
-)
 const whyStages = [
   {
     label: 'CAPTURE',
@@ -90,8 +86,15 @@ function BootLoader() {
 }
 
 function StatusPill() {
-  const [status, setStatus] = useState<'checking' | 'online' | 'offline'>('checking')
+  const [status, setStatus] = useState<'checking' | 'online' | 'offline' | 'not-configured'>(
+    'checking',
+  )
   const check = useCallback(() => {
+    const apiBaseUrl = getApiBaseUrl()
+    if (!apiBaseUrl) {
+      setStatus('not-configured')
+      return
+    }
     const controller = new AbortController()
     const timeout = window.setTimeout(() => controller.abort(), 4500)
     setStatus('checking')
@@ -105,7 +108,12 @@ function StatusPill() {
   }, [check])
   return (
     <div className="vp-status">
-      <i className={`vp-dot ${status}`} /> API {status === 'checking' ? 'checking…' : status}
+      <i className={`vp-dot ${status}`} /> API{' '}
+      {status === 'checking'
+        ? 'checking…'
+        : status === 'not-configured'
+          ? 'not configured'
+          : status}
       <button onClick={check}>retry</button>
       <span className="vp-status-note">The demo works even when the API is offline.</span>
     </div>
@@ -719,8 +727,56 @@ export function LandingExperience() {
       <EvidenceCompare />
       <SolutionScene />
       <UseCases />
+      <section className="vp-architecture" id="architecture">
+        <div>
+          <span className="vp-section-label">07 / EXECUTION BOUNDARY</span>
+          <h2>
+            One clear boundary
+            <br />
+            <em>between the product and providers.</em>
+          </h2>
+          <p>
+            VendorProof keeps provider access on the server-side execution layer. The browser
+            renders authenticated workspace state; it does not hold provider credentials or call
+            GitHub and Stripe directly.
+          </p>
+        </div>
+        <div className="vp-architecture-diagram" aria-label="Swytchcode architecture">
+          <div>
+            <span>01</span>
+            <strong>VendorProof UI</strong>
+            <small>workspace context</small>
+          </div>
+          <i>↓</i>
+          <div>
+            <span>02</span>
+            <strong>Fastify API</strong>
+            <small>auth · tenant scope · audit</small>
+          </div>
+          <i>↓</i>
+          <div className="accent">
+            <span>03</span>
+            <strong>Swytchcode</strong>
+            <small>server-side provider execution</small>
+          </div>
+          <i>↓</i>
+          <div>
+            <span>04</span>
+            <strong>Verified methods</strong>
+            <small>provider response validation</small>
+          </div>
+        </div>
+        <div className="vp-architecture-links">
+          <a href="https://github.com/hitakshijoshi20072911/scppi" target="_blank" rel="noreferrer">
+            View source on GitHub ↗
+          </a>
+          <a href="https://docs.swytchcode.com/" target="_blank" rel="noreferrer">
+            Read official Swytchcode documentation ↗
+          </a>
+        </div>
+      </section>
       <section className="vp-final">
-        <span className="vp-section-label">07 / ENTER THE PRODUCT</span>
+        <span className="vp-section-label">08 / ENTER THE PRODUCT</span>
         <h2>
           Start with the
           <br />

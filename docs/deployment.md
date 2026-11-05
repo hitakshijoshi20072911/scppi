@@ -21,8 +21,8 @@ The API and future background worker remain processes from the same TypeScript m
 
 ## Current implementation and status
 
-- `apps/web/` contains a minimal Next.js shell, not the complete VendorProof product UI.
-- `server/` contains the Fastify foundation and health endpoints, not business APIs or authentication.
+- `apps/web/` contains the scroll-driven public experience, fictional demo, authenticated workspace surfaces, and honest integration states.
+- `server/` contains the Fastify foundation, authenticated tenant-scoped business APIs, reconciliation routes, and health endpoints.
 - `server/src/db/migrations/0000_phase0_baseline.sql` creates only a Phase 0 connectivity sentinel. It is not the VendorProof business schema.
 - `render.yaml` defines the API web service only. It prompts for `DATABASE_URL` and the exact CORS origin; it does not create a database or worker.
 - `apps/web/vercel.json` contains the framework build/install commands. The Vercel project must use the repository as the Git source and `apps/web` as its Root Directory.
@@ -34,6 +34,8 @@ These facts mean the code is suitable for the next implementation phase, not a l
 Create a Vercel project for the repository and set **Root Directory** to `apps/web`. Keep the Next.js framework preset and Node.js 22.13 or newer. The app-specific `vercel.json` uses the root npm workspace lockfile and builds `@vendorproof/web`; verify the first Preview deployment before promoting any release.
 
 Set `NEXT_PUBLIC_API_BASE_URL` separately by environment. It is intentionally public and must contain only the HTTPS API origin, for example `https://api.example.com` (no credentials or path required). Point Preview deployments only at a non-production API and dataset. If no isolated staging API exists yet, do not use preview deployments with real customer data.
+
+The frontend fails closed when this variable is absent: public landing and demo routes remain usable, while workspace API actions show a configuration error rather than silently calling localhost.
 
 Never set `DATABASE_URL`, session secrets, `SWYTCHCODE_TOKEN`, Stripe keys, or GitHub credentials in a `NEXT_PUBLIC_*` variable. Vercel applies environment-variable changes to new deployments, not already-built deployments. See [Vercel monorepo deployment](https://vercel.com/docs/monorepos), [build configuration](https://vercel.com/docs/builds/configure-a-build), and [environment variables](https://vercel.com/docs/environment-variables).
 
@@ -52,7 +54,10 @@ Set these service variables in Render:
 
 Render supplies `PORT` for the web service. Do not hardcode secrets in `render.yaml`; its `sync: false` entries are prompts for dashboard values. Use one exact browser origin for CORS; do not use `*` with credentials. See [Render Blueprints](https://render.com/docs/blueprint-spec), [environment variables and secrets](https://render.com/docs/configure-environment-variables), and [health checks](https://render.com/docs/health-checks).
 
+Because the hosted frontend and API are separate HTTPS origins, production session cookies are `HttpOnly`, `Secure`, `__Host-` cookies with `SameSite=None`; state-changing requests remain protected by the server-issued CSRF token and exact-origin CORS. Local development keeps `SameSite=Lax` and does not require `Secure`.
+
 ### Swytchcode runtime and GitHub connection
+
 The API uses the pinned `@swytchcode/runtime` and `swytchcode` packages. The production executor remains fail-closed when `SWYTCHCODE_TOKEN` is absent. It accepts only the verified GitHub read methods, derives `tenantId` from the authenticated workspace on the server, passes bounded provider parameters through the Runtime SDK, and applies the SDK's 90-second subprocess timeout. It never calls GitHub directly or falls back to the application's own account.
 
 Complete the one-time GitHub provider connection from a laptop with a browser, not from a headless Render shell:
@@ -89,6 +94,10 @@ Supabase's backup retention and restore options depend on its plan. Select a pla
 6. Use a tested Supabase restore procedure only when a database restore is necessary; coordinate downtime and verify the restored project before routing traffic.
 
 The readiness endpoint checks database connectivity when `DATABASE_URL` is configured. It does not verify authentication, business-table migrations, RLS, provider connections, or financial workflows. A healthy endpoint is not a production-readiness certification.
+
+## Stage 2 product boundary
+
+The workspace now supports live clients, projects, contracts, time entries, milestones, source mapping, and reconciliation-run creation through the authenticated API. GitHub repository mapping is intentionally distinct from provider OAuth: a mapped source can remain `not_connected` until the approved Swytchcode tenant connection is completed. Stripe is shown as not configured until its owner-controlled integration exists; the UI never claims a payment or invoice action that the API cannot perform.
 
 ## Official platform references
 

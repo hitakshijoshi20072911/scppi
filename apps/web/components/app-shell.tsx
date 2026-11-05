@@ -9,7 +9,10 @@ const navigation = [
   { href: '/app', label: 'Overview', icon: '◒' },
   { href: '/app/clients', label: 'Clients', icon: '◌' },
   { href: '/app/projects', label: 'Projects', icon: '⌁' },
+  { href: '/app/contracts', label: 'Contracts', icon: '▣' },
+  { href: '/app/records', label: 'Approved records', icon: '✓' },
   { href: '/app/evidence', label: 'Evidence & runs', icon: '↗' },
+  { href: '/app/integrations', label: 'Integrations', icon: '◎' },
   { href: '/app/settings', label: 'Workspace settings', icon: '⊙' },
 ]
 
