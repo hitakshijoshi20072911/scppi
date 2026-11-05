@@ -9,6 +9,7 @@ import { logger } from '../platform/logger.js'
 import { healthRoutes } from './routes/health.js'
 import { phase1Routes } from './routes/phase1.js'
 import { phase2Routes } from './routes/phase2.js'
+import { phase3Routes } from './routes/phase3.js'
 import { productionExecutor, type SwytchcodeExecutor } from '../swytchcode/executor.js'
 
 export async function createServer(options: { phase2Executor?: SwytchcodeExecutor } = {}) {
@@ -32,6 +33,7 @@ export async function createServer(options: { phase2Executor?: SwytchcodeExecuto
   await server.register(healthRoutes)
   await server.register(phase1Routes)
   await server.register(phase2Routes, { executor: options.phase2Executor ?? productionExecutor })
+  await server.register(phase3Routes)
 
   server.addHook('onRequest', async (request) => {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return

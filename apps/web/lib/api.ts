@@ -229,3 +229,33 @@ export function workspaceApi(workspaceId: string) {
     },
   }
 }
+
+export const invoiceApi = (workspaceId: string) => ({
+  eligibleRuns: () =>
+    apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/invoice-eligible-runs`),
+  list: () => apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/invoice-previews`),
+  get: (invoiceId: string) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/invoice-previews/${invoiceId}`),
+  create: (projectId: string, runId: string, runVersion: number) =>
+    apiRequest<RecordRow>(
+      `/api/v1/workspaces/${workspaceId}/projects/${projectId}/runs/${runId}/invoice-previews`,
+      { method: 'POST', body: { runVersion }, retry: false },
+    ),
+  review: (
+    invoiceId: string,
+    input: {
+      decision: 'approve' | 'reject'
+      version: number
+      contentHash: string
+      reason?: string
+    },
+  ) =>
+    apiRequest<RecordRow>(
+      `/api/v1/workspaces/${workspaceId}/invoice-previews/${invoiceId}/review`,
+      {
+        method: 'POST',
+        body: input,
+        retry: false,
+      },
+    ),
+})

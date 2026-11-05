@@ -18,6 +18,8 @@ Verify and integrate read-only GitHub evidence through the approved Swytchcode e
 
 Implement approval content hashes, deterministic invoice previews, Stripe test-mode draft invoice creation, idempotency, uncertain-write recovery, and PDF reports. No invoice finalization, sending, charges, refunds, or payouts.
 
+**2026-11-05 status:** A scoped first implementation adds immutable evidence-backed previews, integer-only calculations, active evidence reservations, recent-owner review, hash revalidation, audit history, and `/app/invoices`. It deliberately does not enable Stripe writes or PDF generation. The trusted Swytchcode allowlist and Stripe test tenant/execution remain unverified; see [`docs/phase3-implementation.md`](phase3-implementation.md). Phase 3 is not complete or production-ready.
+
 ## Phase 4 — Frontend and product experience
 
 Integrate the preserved Lenis implementation into the public/frontend application and build the dashboard, clients, projects, evidence, reconciliation, approval, and draft-invoice experiences.
