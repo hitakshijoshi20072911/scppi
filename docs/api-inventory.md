@@ -2,7 +2,7 @@
 
 **Purpose:** Method-verification register for Swytchcode provider integrations.
 
-**Status:** No provider is currently past catalogue-level evidence.
+**Status:** GitHub and Stripe canonical IDs/schemas reached verification rung 5. GitHub adapter code has mocked tests; no provider authentication or live execution is verified.
 
 ---
 
@@ -74,7 +74,7 @@ A provider only counts at the highest rung actually reached.
 
 **Failure behaviour:** Partial run (R8); retry reads; never fall through to direct calls
 
-**Status:** Canonical IDs and schemas verified. Authentication not yet connected. Sandbox execution not yet verified.
+**Status:** Canonical IDs and schemas verified. A bounded read-only adapter is implemented for paginated `github.pull.get`; the executor allowlist includes the four verified read IDs above. Mocked adapter/executor tests pass. Authentication is not connected and sandbox/live execution is not verified.
 
 ---
 
@@ -267,4 +267,4 @@ A provider counts at the highest rung actually reached, and nothing above it may
 
 ---
 
-**Document status:** Initial inventory created. Verification pending at Milestone 2.
+**Document status:** Canonical method verification is recorded. Authentication and rung-8 execution verification remain pending; do not treat the mocked adapter tests as provider execution evidence.

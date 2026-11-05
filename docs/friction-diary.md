@@ -25,6 +25,9 @@
 | 2026-11-04 20:35 | Stripe integration download | swy get stripe | Download Stripe integration bundle | Saved Stripe/stripe@2026-06-24.dahlia | None required | SUCCESS |
 | 2026-11-04 20:36 | Method schema inspection | swy info for github.pull.get, github.pull.commits.get, stripe.invoice.create, stripe.invoice.get | Verify canonical IDs and schemas | Schemas verified (large files truncated in output) | None required | SUCCESS |
 | 2026-11-04 20:37 | Wrekenfile evidence copy | Copy Wrekenfiles to docs/evidence/swytchcode/ | Preserve evidence for assignment submission | Files copied successfully | PowerShell mkdir/copy syntax differences | SUCCESS |
+| 2026-11-05 08:50 | Phase 2 environment capability check | Checked DATABASE_URL, SWYTCHCODE_TOKEN, swy, psql, and docker availability | Run live migration and sandbox provider verification | No database URL, Swytchcode token/runtime CLI, PostgreSQL client, or Docker found in this sandbox | Kept provider executor unavailable by default; used a verified-method adapter with mocked tests and documented live verification as a blocker | BLOCKED (environment) |
+| 2026-11-05 08:53 | SQL formatting check | npx prettier --write server/src/db/migrations/0002_phase2_evidence_reconciliation.sql | Format the new migration | Prettier could not infer a parser for `.sql` | Excluded SQL from Prettier and kept repository format checks on supported TS/TSX/JSON/CSS extensions; migration syntax remains unexecuted without PostgreSQL | RESOLVED (formatter scope); DB validation still blocked |
+| 2026-11-05 09:00 | Full dependency audit | npm audit --audit-level=moderate | Confirm workspace dependency health | Four moderate advisories reported via Drizzle Kit's deprecated esbuild loader; `npm audit fix --force` proposes a breaking Drizzle Kit downgrade | Did not force a breaking downgrade; production dependency audit is clean and the open tooling advisory remains tracked in `docs/security-review.md` | OPEN (tracked) |
 
 ---
 
@@ -36,7 +39,7 @@
 - The MCP process initially did not detect the intended project root
 - The project path was added to MCP configuration
 - MCP discovery was subsequently reported as working
-- No Wrekenfile exists yet because no integration has been downloaded
+- At that initial 19:05 setup point no Wrekenfile existed; GitHub and Stripe bundles were subsequently downloaded at 20:35 and their schemas inspected.
 
 ### Architecture Source
 - Architecture Part 1 (Sections 1-6) and Part 2 (Sections 7-17) were read
@@ -52,7 +55,7 @@
 
 ---
 
-**Document status:** Friction diary maintained. No unresolvable issues encountered.
+**Document status:** Friction diary maintained. The Phase 2 sandbox lacks live database/Swytchcode capabilities, and the development-tool audit advisory remains open; both are documented above.
 
 
 ## Phase 0 implementation — 2026-11-04

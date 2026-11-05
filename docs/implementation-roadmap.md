@@ -8,9 +8,11 @@ Establish reproducible workspaces, the Fastify foundation, PostgreSQL/Drizzle mi
 
 Implement authentication, workspaces, membership, authorization, clients, projects, contracts, time records, milestones, and tenant-scoped repositories.
 
-## Phase 2 — Evidence and reconciliation engine
+## Phase 2 — Evidence and reconciliation engine (backend implemented; live verification pending)
 
 Verify and integrate read-only GitHub evidence through the approved Swytchcode executor. Implement work-item mapping, deterministic classification, human-approved billing evidence, and reconciliation state transitions.
+
+**2026-11-05 status:** The backend routes, migrations, guarded provider adapter/executor boundary, deterministic classification, versioned reconciliation transitions, failed-source retry, and human decision workflow are implemented on `feat/phase-2-evidence-reconciliation`. Automated checks pass. Live GitHub execution, OAuth connection flow, and PostgreSQL migration/RLS integration tests are blocked in the current sandbox; see [`docs/phase2-implementation.md`](phase2-implementation.md) for exact boundaries and next steps. Phase 2 must not be marked production-ready until those external checks pass.
 
 ## Phase 3 — Invoice and approval workflow
 
