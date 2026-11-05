@@ -1,20 +1,55 @@
 'use client'
-
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/components/auth-provider'
-import { workspaceApi } from '@/lib/api'
-
+import { RecordRow, workspaceApi } from '@/lib/api'
 export default function ClientsPage() {
   const { activeWorkspace } = useAuth()
-  const [clients, setClients] = useState<Record<string, unknown>[] | null>(null)
-  useEffect(() => {
-    if (activeWorkspace)
-      void workspaceApi(activeWorkspace.id)
+  const [clients, setClients] = useState<RecordRow[] | null>(null)
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState({ name: '', contactEmail: '', notes: '' })
+  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+  const load = () => {
+    if (activeWorkspace) {
+      setError(null)
+      workspaceApi(activeWorkspace.id)
         .clients()
         .then(setClients)
-        .catch(() => setClients([]))
-  }, [activeWorkspace])
+        .catch((e) => setError(e instanceof Error ? e.message : 'Clients could not be loaded.'))
+    }
+  }
+  useEffect(load, [activeWorkspace])
+  const filtered = useMemo(
+    () =>
+      (clients ?? []).filter((c) =>
+        String(c.name ?? '')
+          .toLowerCase()
+          .includes(query.toLowerCase()),
+      ),
+    [clients, query],
+  )
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!activeWorkspace) return
+    setPending(true)
+    setError(null)
+    try {
+      await workspaceApi(activeWorkspace.id).createClient({
+        name: form.name,
+        contactEmail: form.contactEmail || null,
+        notes: form.notes || null,
+      })
+      setForm({ name: '', contactEmail: '', notes: '' })
+      setOpen(false)
+      load()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Client could not be created.')
+    } finally {
+      setPending(false)
+    }
+  }
   return (
     <>
       <header className="page-heading">
@@ -25,32 +60,90 @@ export default function ClientsPage() {
             Keep every project grounded in the client relationship it belongs to.
           </p>
         </div>
-        <button
-          className="button button-dark"
-          disabled
-          title="Client creation UI is the next CRUD slice"
-        >
+        <button className="button button-dark" onClick={() => setOpen(true)}>
           Add client <span>＋</span>
         </button>
       </header>
+      {error && (
+        <div className="alert alert-error" role="alert">
+          {error} <button onClick={load}>Retry</button>
+        </div>
+      )}
       <section className="panel panel-large">
-        <p className="eyebrow">Live records</p>
-        <h2>
-          {clients === null
-            ? 'Loading clients…'
-            : clients.length
-              ? `${clients.length} client${clients.length === 1 ? '' : 's'} in this workspace`
-              : 'No clients yet.'}
-        </h2>
-        <p className="panel-copy">
-          {clients?.length
-            ? 'Client records are coming from the VendorProof API.'
-            : 'Your workspace is ready. The next step is to add a client before creating a project.'}
-        </p>
-        <Link href="/app" className="button button-accent">
-          Back to overview <span>↗</span>
-        </Link>
+        <div className="panel-toolbar">
+          <div>
+            <p className="eyebrow">Live records</p>
+            <h2>
+              {clients === null
+                ? 'Loading clients…'
+                : `${filtered.length} client${filtered.length === 1 ? '' : 's'}`}
+            </h2>
+          </div>
+          <input
+            className="table-search"
+            placeholder="Search clients"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+        {clients?.length ? (
+          <div className="record-table">
+            {filtered.map((client) => (
+              <div className="record-row" key={String(client.id)}>
+                <div>
+                  <strong>{String(client.name ?? 'Unnamed client')}</strong>
+                  <small>{String(client.contact_email ?? 'No contact email')}</small>
+                </div>
+                <span className="record-status">{String(client.status ?? 'active')}</span>
+              </div>
+            ))}
+          </div>
+        ) : clients ? (
+          <p className="panel-copy">
+            No client records yet. Add your first client to give projects billing context.
+          </p>
+        ) : null}
       </section>
+      {open && (
+        <div className="modal-backdrop">
+          <form className="modal-card" onSubmit={submit}>
+            <button className="modal-close" type="button" onClick={() => setOpen(false)}>
+              ×
+            </button>
+            <p className="eyebrow">New client</p>
+            <h2>Give the work a relationship.</h2>
+            <label>
+              Name
+              <input
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </label>
+            <label>
+              Contact email <span className="optional">optional</span>
+              <input
+                type="email"
+                value={form.contactEmail}
+                onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
+              />
+            </label>
+            <label>
+              Notes <span className="optional">optional</span>
+              <textarea
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              />
+            </label>
+            <button className="button button-dark button-wide" disabled={pending}>
+              {pending ? 'Creating…' : 'Create client ↗'}
+            </button>
+          </form>
+        </div>
+      )}
+      <Link className="text-link" href="/app">
+        ← Back to overview
+      </Link>
     </>
   )
 }

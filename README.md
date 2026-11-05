@@ -6,15 +6,16 @@ VendorProof is a work-to-invoice reconciliation platform for technical freelance
 
 ## Current status
 
-The Phase 2 backend and frontend authentication foundation are merged to `main`. The current implementation includes:
+The Phase 2 backend and frontend product-experience branch are ready for review. The current implementation includes:
 
 - A Fastify API foundation with request IDs, safe errors, exact-origin CORS, security headers, and health endpoints.
-- A Next.js frontend with public landing, login, registration, protected workspace shell, workspace selection, live dashboard counts, and honest empty states for unsupported capabilities.
+- A Next.js frontend with a Lenis-powered, reduced-motion-safe product landing page, login, registration, protected workspace shell, workspace selection, live dashboard counts, and API-backed client/project creation.
+- An unauthenticated `/demo` experience using deterministic fictional Northstar Studio / Atlas Platform fixtures. It never calls GitHub, Swytchcode, Stripe, authentication, or production write endpoints.
 - PostgreSQL/Drizzle migration scaffolding with a Phase 0 connectivity sentinel only.
 - A root npm workspace with one authoritative `package-lock.json`.
 - Vitest backend unit tests, a Playwright browser smoke test, ESLint, Prettier, TypeScript checks, and GitHub Actions CI.
 - A Render Blueprint for the API web service, now tracking `main`. Supabase remains the database host; the Blueprint does not create a database or background worker.
-- Preserved Lenis source under `server/src/lenis`; it is excluded from backend compilation and must be integrated into `apps/web` only in the approved frontend phase.
+- Preserved Lenis source under `server/src/lenis`; the browser provider is integrated under `apps/web/components/lenis-provider.tsx`, with cleanup, anchors, touch sync, and reduced-motion handling.
 - PostgreSQL-backed authentication, revocable sessions, users, workspaces, memberships, role permissions, clients, projects, contracts, human-entered time entries, fixed-price milestones, and append-only audit events.
 - GitHub repository mapping, contract-scoped deterministic classification, versioned evidence-reconciliation runs, failed-source retry, explicit partial-data acceptance, and owner/admin human review.
 - Forced workspace RLS for the additive Phase 2 tables and a payload-minimizing, mocked-tested GitHub read adapter behind an injectable Swytchcode executor.
@@ -39,7 +40,7 @@ The application remains a modular monolith. API and future worker processes shar
 
 ## Repository structure
 
-- `apps/web/` — Next.js frontend foundation.
+- `apps/web/` — Next.js frontend, product landing, demo, authenticated shell, and API-backed management screens.
 - `server/` — Fastify API, future worker entrypoint, Drizzle config, and migrations.
 - `packages/shared/` — shared validation contracts and types.
 - `docs/` — architecture, deployment, security, operations, testing, and roadmap documentation.
