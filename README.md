@@ -6,7 +6,7 @@ VendorProof is a work-to-invoice reconciliation platform for technical freelance
 
 ## Current status
 
-Phase 1 foundation is implemented on `feat/foundation-0`. The current implementation includes:
+Phase 2 backend work is implemented on `feat/phase-2-evidence-reconciliation`; Phase 0/1 remain the foundation. The current implementation includes:
 
 - A Fastify API foundation with request IDs, safe errors, exact-origin CORS, security headers, and health endpoints.
 - A minimal Next.js frontend shell intended for Vercel.
@@ -16,8 +16,10 @@ Phase 1 foundation is implemented on `feat/foundation-0`. The current implementa
 - A Render Blueprint for the API web service. Supabase is the planned database host; the Blueprint does not create a database or background worker.
 - Preserved Lenis source under `server/src/lenis`; it is excluded from backend compilation and must be integrated into `apps/web` only in the approved frontend phase.
 - PostgreSQL-backed authentication, revocable sessions, users, workspaces, memberships, role permissions, clients, projects, contracts, human-entered time entries, fixed-price milestones, and append-only audit events.
+- GitHub repository mapping, contract-scoped deterministic classification, versioned evidence-reconciliation runs, failed-source retry, explicit partial-data acceptance, and owner/admin human review.
+- Forced workspace RLS for the additive Phase 2 tables and a payload-minimizing, mocked-tested GitHub read adapter behind an injectable Swytchcode executor.
 
-No production service has been deployed. Provider execution, tenant RLS, real worker jobs, reconciliation, and invoice workflows remain deferred. No GitHub or Stripe provider calls or financial operations are part of Phase 1.
+No production service has been deployed. The default Swytchcode executor is deliberately unavailable and GitHub sources remain `not_connected` until a reviewed runtime/OAuth flow is supplied. No live provider call or database migration was executed in this environment. Invoice workflows and durable worker jobs remain deferred.
 
 ## Architecture
 
@@ -33,7 +35,7 @@ Supabase: PostgreSQL
 Render background worker: deferred until durable jobs are implemented
 ```
 
-The application remains a modular monolith. API and future worker processes share one TypeScript codebase and the PostgreSQL database. Provider calls will be added later behind a server-side Swytchcode executor. The frontend never holds provider credentials or calls providers directly.
+The application remains a modular monolith. API and future worker processes share one TypeScript codebase and the PostgreSQL database. Phase 2 exposes a server-side Swytchcode executor injection point and defaults to a fail-closed unavailable executor; direct provider HTTP/SDK calls are prohibited. The frontend never holds provider credentials or calls providers directly.
 
 ## Repository structure
 
@@ -42,7 +44,7 @@ The application remains a modular monolith. API and future worker processes shar
 - `packages/shared/` — shared validation contracts and types.
 - `docs/` — architecture, deployment, security, operations, testing, and roadmap documentation.
 - `server/src/lenis/` — preserved browser-only Lenis source; not backend runtime code.
-- `.swytchcode/` — downloaded provider definitions and sandbox configuration; no provider tools are enabled in Phase 0.
+- `.swytchcode/` — downloaded provider definitions and sandbox configuration; downloaded schemas are not proof of authenticated or executed provider calls.
 
 ## Prerequisites
 
@@ -51,7 +53,7 @@ The application remains a modular monolith. API and future worker processes shar
 - Docker for the easiest local PostgreSQL setup, or another PostgreSQL instance.
 - Git.
 
-Swytchcode CLI and provider authentication are not required for Phase 0.
+Swytchcode CLI and provider authentication are not required for Phase 0. Live Phase 2 GitHub ingestion requires a reviewed executor transport and an authorized GitHub connection; the current code safely remains disabled without them.
 
 ## Local development
 
@@ -93,7 +95,7 @@ npm audit --omit=dev --audit-level=high
 
 The E2E test requires Playwright Chromium; install it with `npx playwright install chromium` if needed. `db:check` is a static Drizzle migration check; it does not test a live database. The Phase 0 migration creates a connectivity sentinel, not the product schema.
 
-See [`docs/phase0-validation.md`](docs/phase0-validation.md) for the latest executed checks and their limits.
+See [`docs/phase0-validation.md`](docs/phase0-validation.md) for Phase 0 validation and [`docs/phase2-implementation.md`](docs/phase2-implementation.md) for Phase 2 scope, current checks, and live-verification blockers.
 
 ## Deployment
 

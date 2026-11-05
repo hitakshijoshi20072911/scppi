@@ -2,7 +2,7 @@
 
 **Purpose:** Security review register for findings, remediation, and status.
 
-**Current Status:** Phase 0 scoped internal review recorded; no formal or external security audit has been performed.
+**Current Status:** Phase 0/1/2 scoped internal code review recorded; no formal or external security audit has been performed.
 
 ---
 
@@ -10,7 +10,7 @@
 
 **Scoped internal review only — not a formal security audit**
 
-This register records code and dependency findings from the Phase 0 foundation review. It does not represent penetration testing, a compliance review, or an external audit.
+This register records code and dependency findings from the Phase 0 foundation and Phase 1/2 implementation reviews. It does not represent penetration testing, a compliance review, or an external audit.
 
 The threat model in `docs/threat-model.md` documents the planned security controls. Remaining implementation gaps and the dependency finding are listed below.
 
@@ -147,11 +147,17 @@ Before production deployment:
 
 ---
 
-**Document status:** Initial security review register created. No findings yet. External audit pending.
+**Document status:** Internal review register maintained. DEP-001 remains open for development tooling; external audit pending.
 
 
 ## Phase 0 foundation review — 2026-11-04
 
 The Phase 0 implementation adds validated environment configuration, redacted Pino logging, request IDs, exact-origin CORS, Helmet security headers, body-size limits, safe 404/error responses, and backend/frontend separation. These controls are foundation-level only and do not constitute a complete security audit.
 
-Open findings remain: authentication and authorization are not implemented; tenant isolation is documented but not enforced by a database schema; session and CSRF controls are not implemented; provider credentials are not connected; and Swytchcode execution is not implemented. Database startup and migration execution were not testable in the sandbox. The production dependency audit is clean, but the full workspace audit has the moderate development-tool finding above; a dedicated secret scanner and an external security review have not been run.
+Phase 1 implements authentication, authorization, sessions, and server-side CSRF checks. The additive Phase 2 tables use forced RLS with a transaction-local workspace setting, plus explicit workspace predicates. However, the Phase 2 SQL migration and actual RLS isolation were not exercised against PostgreSQL in this sandbox, so that control is not live-verified. GitHub credentials/OAuth and a reviewed Swytchcode transport are not connected; the default executor fails closed. The production dependency audit is clean, but the full workspace audit has the moderate development-tool finding above; a dedicated secret scanner and an external security review have not been run.
+
+## Phase 2 scoped review — 2026-11-05
+
+Review scope: source mapping, strict provider response reduction, tenant-scoped persistence, versioned reconciliation transitions, deterministic keyword matching, partial-source retry/acceptance, and human review. No direct GitHub network client, shell execution, provider credentials, or autonomous approval was added. Raw PR bodies, comments, diffs, file lists, and code are not retained. `provider_execution` stores hashed request/correlation identifiers and response shape counts only.
+
+Regression coverage includes mocked executor allowlisting and response validation, deterministic classification/injection-like input, optimistic version conflicts, and unauthenticated Phase 2 route rejection. These tests are not a penetration test or real provider verification. Before deployment, test migration application and cross-workspace RLS with two actual workspace identities, verify CSRF on every mutation, run authenticated owner/admin/member authorization tests, and complete the provider sandbox rung documented in `docs/api-inventory.md`.

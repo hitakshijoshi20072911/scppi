@@ -10,6 +10,17 @@ afterEach(async () => {
 })
 
 describe('health endpoints', () => {
+  it('reports service status at the API root', async () => {
+    server = await createServer()
+    const response = await server.inject({ method: 'GET', url: '/' })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({
+      service: 'vendorproof-api',
+      status: 'ok',
+      version: 'v1',
+    })
+  })
+
   it('reports liveness and a request id', async () => {
     server = await createServer()
     const response = await server.inject({ method: 'GET', url: '/health/live' })

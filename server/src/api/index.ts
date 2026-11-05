@@ -8,8 +8,10 @@ import { authenticate } from '../modules/core.js'
 import { logger } from '../platform/logger.js'
 import { healthRoutes } from './routes/health.js'
 import { phase1Routes } from './routes/phase1.js'
+import { phase2Routes } from './routes/phase2.js'
+import type { SwytchcodeExecutor } from '../swytchcode/executor.js'
 
-export async function createServer() {
+export async function createServer(options: { phase2Executor?: SwytchcodeExecutor } = {}) {
   const server = Fastify({
     logger: false,
     trustProxy: true,
@@ -19,8 +21,17 @@ export async function createServer() {
 
   await server.register(helmet, { global: true })
   await server.register(cors, { origin: config.API_CORS_ORIGIN, credentials: true })
+  server.get('/', async (_request, reply) =>
+    reply.send({
+      service: 'vendorproof-api',
+      status: 'ok',
+      version: 'v1',
+      endpoints: { liveness: '/health/live', readiness: '/health/ready' },
+    }),
+  )
   await server.register(healthRoutes)
   await server.register(phase1Routes)
+  await server.register(phase2Routes, { executor: options.phase2Executor })
 
   server.addHook('onRequest', async (request) => {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return

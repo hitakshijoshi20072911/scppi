@@ -77,32 +77,27 @@
 ## Current Status
 
 ### Completed
-- Swytchcode CLI exploration: ✓
-- CLI version documented: ✓ (2.25.1)
-- Project configuration verified: ✓ (sandbox mode)
-- MCP configuration verified: ✓
-- Friction diary maintained: ✓
-- GitHub repository: Pending
-- README: Pending (to be updated)
-- API operation execution: Not yet (no integrations downloaded)
-- Practical example: Not yet (no integrations downloaded)
-- Wrekenfile exploration: Not yet (no integrations downloaded)
-- Marketing asset: Pending (README to be updated)
-- Swytchcode explanation: Pending
-- Demo video: Pending
-- AI tools disclosure: Pending
-- Sanitised evidence: Pending
+- Swytchcode CLI exploration and sandbox configuration: ✓ (2.25.1, as previously recorded)
+- GitHub and Stripe integrations downloaded; required canonical IDs and schemas inspected: ✓ (verification rung 5)
+- Phase 2 backend routes, persistence migration, tenant RLS policies, guarded GitHub adapter, deterministic classifier, versioned state machine, retry/partial acceptance, and human review workflow: ✓ (see [`docs/phase2-implementation.md`](docs/phase2-implementation.md))
+- Repository README and Phase 2 API/security/roadmap documentation: ✓
+- Friction diary maintained without claiming a live provider call: ✓
+- TypeScript (server/web), unit tests (35), lint, format, production build, and static db:check: ✓
+- Production dependency audit: ✓ (zero production vulnerabilities)
+- Full dependency audit: Open — four moderate development-tool advisories through Drizzle Kit's esbuild loader
+- GitHub branch push: ✓ `feat/phase-2-evidence-reconciliation` (`6d917c4`, verified on `origin`)
+- Live GitHub operation through Swytchcode: Not run; no runtime/OAuth connection in this environment
+- PostgreSQL migration/RLS integration test: Not run; no database URL/server/client in this environment
+- Demo video, standalone practical execution transcript, and separate AI tools disclosure: Pending broader submission work
 
 ### Blockers
-- No provider integrations downloaded yet (awaiting product selection)
-- No API operations executed yet (awaiting provider verification)
-- No Wrekenfiles available yet (awaiting provider download)
+- The sandbox has no `DATABASE_URL`, PostgreSQL server/client, Swytchcode runtime transport, or GitHub OAuth connection. Provider execution therefore remains fail-closed and the Phase 2 SQL migration has not been applied to a live test database.
+- Full `npm audit fix --force` was not run because npm proposes a breaking Drizzle Kit downgrade; the four moderate development-tool advisories remain documented in `docs/security-review.md`.
 
 ### Notes
-- This is an initial architecture and repository bootstrap task
-- Provider integration and API execution will occur in later milestones
-- The repository foundation is being prepared for future development
-- All documentation is in place to guide future implementation
+- Phase 2 is implemented and tested as code, but not yet production-ready: complete the runtime/OAuth and live PostgreSQL verification gates documented in `docs/phase2-implementation.md`.
+- Phase 3 (invoice approvals and Stripe draft invoices), Phase 4 (full frontend), and Phase 5 (staging/deployment) remain future milestones.
+- No production service, provider credential, or paid resource was created by this continuation.
 
 ---
 

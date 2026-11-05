@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createServer } from '../src/api/index.js'
 import { hashPassword, validatePassword, verifyPassword } from '../src/modules/core.js'
+import { configSchema } from '../src/platform/config.js'
 
 let server: Awaited<ReturnType<typeof createServer>> | undefined
 afterEach(async () => {
@@ -9,6 +10,12 @@ afterEach(async () => {
 })
 
 describe('Phase 1 security primitives', () => {
+  it('normalizes a trailing slash from the configured CORS origin', () => {
+    expect(configSchema.parse({ API_CORS_ORIGIN: 'https://example.com/' }).API_CORS_ORIGIN).toBe(
+      'https://example.com',
+    )
+  })
+
   it('hashes passwords with a unique salted scrypt value', async () => {
     const first = await hashPassword('correct horse 123')
     const second = await hashPassword('correct horse 123')
