@@ -2,7 +2,7 @@
 
 **Purpose:** Method-verification register for Swytchcode provider integrations.
 
-**Status:** GitHub and Stripe canonical IDs/schemas reached verification rung 5. GitHub adapter code has mocked tests; no provider authentication or live execution is verified.
+**Status:** GitHub canonical IDs/schemas reached rung 6 and the four read methods are enabled in `.swytchcode/tooling.json`. The production executor is wired to the official runtime and mocked tests pass; provider authentication and live execution remain pending owner OAuth consent.
 
 ---
 
@@ -25,7 +25,7 @@ A provider only counts at the highest rung actually reached.
 
 | Provider | Business purpose | Verification level | Canonical ID | Input schema | Output schema | Authentication | Test evidence |
 |---|---|---|---|---|---|---|---|
-| GitHub | PR and commit evidence (read) | Rung 5 (Canonical IDs and schemas verified) | github.pull.get, github.pull.commits.get | See Wrekenfile | See Wrekenfile | oauth2 | Not yet (no auth connected) |
+| GitHub | PR and commit evidence (read) | Rung 6 (Methods enabled) | github.pull.get, github.pull.commits.get, github.pull.get1, github.commit.get2 | See Wrekenfile | See Wrekenfile | oauth2 | Pending owner OAuth consent and live test |
 | Stripe | Draft invoice (write) | Rung 5 (Canonical IDs and schemas verified) | stripe.invoice.create, stripe.invoice.get | See Wrekenfile | See Wrekenfile | api_key | Not yet (no auth connected) |
 | Google Drive | Private copy of audit report (write) | None | - | - | - | - | - |
 | Slack | Approval-needed notification (write) | Catalogue mention only | - | - | - | - | - |
@@ -41,7 +41,7 @@ A provider only counts at the highest rung actually reached.
 
 **Purpose:** Read pull requests, commits, and work evidence.
 
-**Verification level:** Rung 5 (Canonical IDs and schemas verified)
+**Verification level:** Rung 6 (Method enabled; live authentication pending)
 
 **Integration version:** GitHub@1.1.4
 
@@ -74,7 +74,7 @@ A provider only counts at the highest rung actually reached.
 
 **Failure behaviour:** Partial run (R8); retry reads; never fall through to direct calls
 
-**Status:** Canonical IDs and schemas verified. A bounded read-only adapter is implemented for paginated `github.pull.get`; the executor allowlist includes the four verified read IDs above. Mocked adapter/executor tests pass. Authentication is not connected and sandbox/live execution is not verified.
+**Status:** The four methods are enabled in `.swytchcode/tooling.json`, the official runtime is pinned and wired into the server, and the bounded read-only adapter has passing mocked tests. Authentication and live execution remain pending owner OAuth consent; do not treat mocked adapter tests as provider execution evidence.
 
 ---
 
@@ -267,4 +267,4 @@ A provider counts at the highest rung actually reached, and nothing above it may
 
 ---
 
-**Document status:** Canonical method verification is recorded. Authentication and rung-8 execution verification remain pending; do not treat the mocked adapter tests as provider execution evidence.
+**Document status:** Canonical method verification and method enablement are recorded. Authentication and rung-8 execution verification remain pending owner OAuth consent; do not treat the mocked adapter tests as provider execution evidence.
