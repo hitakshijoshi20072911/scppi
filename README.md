@@ -6,20 +6,20 @@ VendorProof is a work-to-invoice reconciliation platform for technical freelance
 
 ## Current status
 
-Phase 2 backend work is implemented on `feat/phase-2-evidence-reconciliation`; Phase 0/1 remain the foundation. The current implementation includes:
+The Phase 2 backend and frontend authentication foundation are merged to `main`. The current implementation includes:
 
 - A Fastify API foundation with request IDs, safe errors, exact-origin CORS, security headers, and health endpoints.
-- A minimal Next.js frontend shell intended for Vercel.
+- A Next.js frontend with public landing, login, registration, protected workspace shell, workspace selection, live dashboard counts, and honest empty states for unsupported capabilities.
 - PostgreSQL/Drizzle migration scaffolding with a Phase 0 connectivity sentinel only.
 - A root npm workspace with one authoritative `package-lock.json`.
 - Vitest backend unit tests, a Playwright browser smoke test, ESLint, Prettier, TypeScript checks, and GitHub Actions CI.
-- A Render Blueprint for the API web service. Supabase is the planned database host; the Blueprint does not create a database or background worker.
+- A Render Blueprint for the API web service, now tracking `main`. Supabase remains the database host; the Blueprint does not create a database or background worker.
 - Preserved Lenis source under `server/src/lenis`; it is excluded from backend compilation and must be integrated into `apps/web` only in the approved frontend phase.
 - PostgreSQL-backed authentication, revocable sessions, users, workspaces, memberships, role permissions, clients, projects, contracts, human-entered time entries, fixed-price milestones, and append-only audit events.
 - GitHub repository mapping, contract-scoped deterministic classification, versioned evidence-reconciliation runs, failed-source retry, explicit partial-data acceptance, and owner/admin human review.
 - Forced workspace RLS for the additive Phase 2 tables and a payload-minimizing, mocked-tested GitHub read adapter behind an injectable Swytchcode executor.
 
-No production service has been deployed. The default Swytchcode executor is deliberately unavailable and GitHub sources remain `not_connected` until a reviewed runtime/OAuth flow is supplied. No live provider call or database migration was executed in this environment. Invoice workflows and durable worker jobs remain deferred.
+The public Vercel frontend (`https://vendorproof-web-two.vercel.app/`) and Render API (`https://vendorproof-api.onrender.com/`) returned successful smoke-test responses on 2026-11-05, including API database readiness. These checks do not prove production readiness: the observed Render CORS value still pointed at a Vercel preview hostname, and the Render dashboard secret values and tenant-specific GitHub OAuth connection require owner-controlled verification. The default Swytchcode executor remains fail-closed when its server-only token or provider connection is unavailable. Invoice workflows and durable worker jobs remain deferred.
 
 ## Architecture
 

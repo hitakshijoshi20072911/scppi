@@ -1,6 +1,6 @@
 # VendorProof Deployment Architecture
 
-**Status: planned, not deployed.** The repository contains deployment configuration scaffolding only. No Vercel, Render, or Supabase project has been created or connected by this work.
+**Status: repository configuration updated; hosted smoke test observed.** The repository now targets `main` for the Render Blueprint. A public Vercel frontend and Render API were reachable during the 2026-11-05 smoke test, but provider-dashboard configuration is not controlled by this repository and production readiness is not implied.
 
 ## Target topology
 
@@ -69,7 +69,7 @@ npx swytchcode auth status
 
 Do not paste the service token, GitHub password, or OAuth code into chat. The provider consent must finish successfully before claiming live GitHub evidence ingestion. Afterward, set the same rotated service token as the Render `SWYTCHCODE_TOKEN` secret and redeploy. If the CLI reports `setup_required`, the Swytchcode workspace owner must first complete `swy auth connect github`; if it reports `tenant_not_connected`, the signed-in VendorProof workspace still needs its workspace-level connection flow.
 
-The Blueprint currently follows `feat/foundation-0` so it can be previewed from this branch. Before production, merge a reviewed release to `main` and update the Blueprint service branch to `main`. Confirm the service's selected region, plan, auto-deploy policy, and environment before its first production deploy.
+The Blueprint follows `main`, which is the repository's merged release branch. Confirm the Render service's selected region, plan, auto-deploy policy, and environment before treating it as production. The public smoke test showed the API database readiness check passing, but its configured CORS origin was a Vercel preview hostname rather than `https://vendorproof-web-two.vercel.app`; update the Render `API_CORS_ORIGIN` secret in the dashboard before relying on browser-to-API authentication from the public production hostname.
 
 ## Supabase PostgreSQL
 
