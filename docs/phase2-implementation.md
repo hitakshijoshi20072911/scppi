@@ -1,6 +1,6 @@
 # Phase 2 implementation — evidence and reconciliation
 
-**Status:** Phase 2 backend implementation is prepared on `feat/phase-2-evidence-reconciliation`; automated checks pass. Live GitHub reads and PostgreSQL migration execution remain unverified because the current sandbox has no database URL, PostgreSQL client/server, or Swytchcode runtime credentials. The default provider executor fails closed, so this code does not claim a real provider call.
+**Status:** Phase 2 backend implementation is pushed on `feat/phase-2-evidence-reconciliation` (`6d917c4`); automated checks pass. Live GitHub reads and PostgreSQL migration execution remain unverified because the current sandbox has no database URL, PostgreSQL client/server, or Swytchcode runtime credentials. The default provider executor fails closed, so this code does not claim a real provider call.
 
 ## Delivered
 
