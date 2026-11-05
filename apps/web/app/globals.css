@@ -2612,3 +2612,194 @@ html.vp-booting {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+.vp-workflow-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+.vp-workflow-connector {
+  fill: none;
+  stroke: var(--vp-lime);
+  stroke-width: 2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 5px rgba(183, 227, 107, 0.32));
+}
+.vp-art-card {
+  z-index: 3;
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.28),
+    0 0 28px rgba(53, 184, 121, 0.08);
+  transition:
+    border-color 0.25s,
+    box-shadow 0.25s;
+}
+.vp-art-card:hover {
+  border-color: var(--vp-lime);
+  box-shadow:
+    0 20px 55px rgba(0, 0, 0, 0.32),
+    0 0 34px rgba(183, 227, 107, 0.14);
+}
+.vp-card-icon {
+  display: grid !important;
+  place-items: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  margin-bottom: 0.8rem;
+  border: 1px solid var(--vp-lime);
+  border-radius: 50%;
+  color: var(--vp-lime);
+  font: 700 0.78rem var(--vp-mono) !important;
+}
+.vp-stage-caption {
+  z-index: 6;
+}
+.vp-stage-caption strong {
+  max-width: 25ch;
+}
+.vp-case-viewport {
+  position: relative;
+  overflow: visible;
+}
+.vp-case-track {
+  position: relative;
+  will-change: transform;
+}
+.vp-case-track article {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(22, 123, 82, 0.3);
+  box-shadow: 0 14px 32px rgba(22, 123, 82, 0.08);
+  transition:
+    transform 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+.vp-case-track article::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  transform: scaleX(0);
+  transform-origin: left;
+  background: var(--vp-green);
+  transition: transform 0.3s ease;
+}
+.vp-case-track article.active,
+.vp-case-track article:hover,
+.vp-case-track article:focus-visible {
+  transform: translateY(-8px);
+  border-color: var(--vp-green);
+  box-shadow: 0 20px 42px rgba(22, 123, 82, 0.18);
+}
+.vp-case-track article.active::after,
+.vp-case-track article:hover::after,
+.vp-case-track article:focus-visible::after {
+  transform: scaleX(1);
+}
+.vp-audience-icon {
+  position: absolute;
+  right: 1.35rem;
+  top: 1.2rem;
+  width: 3rem;
+  height: 3rem;
+  fill: none;
+  stroke: var(--vp-green);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.vp-case-track article h3 {
+  max-width: 10ch;
+  margin-top: 5.5rem;
+}
+.vp-case-track article > p {
+  max-width: 30ch;
+}
+.vp-case-track article > b {
+  position: absolute;
+  right: 1.4rem;
+  bottom: 1.25rem;
+  color: var(--vp-green);
+  font: 700 1.3rem var(--vp-mono);
+}
+.vp-case-progress {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: calc(100vw - 16vw);
+  margin: 2.2rem auto 0;
+  color: rgba(8, 11, 9, 0.58);
+  font: 700 0.62rem var(--vp-mono);
+}
+.vp-case-progress span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: rgba(8, 11, 9, 0.14);
+  transform-origin: left;
+}
+.vp-case-progress span::after {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--vp-green);
+}
+.vp-case-progress small {
+  min-width: 3.5rem;
+}
+.vp-status-note {
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .vp-workflow-lines {
+    display: none;
+  }
+  .vp-case-viewport {
+    overflow-x: auto;
+    overflow-y: visible;
+    margin-inline: -6vw;
+    padding-inline: 6vw;
+    padding-bottom: 1rem;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+  }
+  .vp-case-track {
+    transform: none !important;
+  }
+  .vp-case-track article {
+    scroll-snap-align: start;
+  }
+  .vp-case-progress {
+    max-width: none;
+    margin-top: 1.5rem;
+  }
+  .vp-case-track article.active {
+    transform: none;
+  }
+  .vp-status-note {
+    display: none;
+  }
+}
+@media (max-width: 580px) {
+  .vp-case-progress {
+    margin-inline: 0;
+  }
+  .vp-card-icon {
+    margin-bottom: 0.5rem;
+  }
+}
+.vp-card-icon svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
