@@ -279,3 +279,8 @@ VendorProof uses the authenticated workspace ID unchanged as `tenantId`. It neve
 The exact verified GitHub read IDs remain `github.pull.get`, `github.pull.commits.get`, `github.pull.get1`, and `github.commit.get2`. Commit ingestion uses `github.pull.commits.get` with `owner`, `repo`, `pull_number`, `per_page`, and `page`, and retains only SHA, commit subject, allowed author metadata, timestamps, URL, and the related PR identifier. It does not use direct GitHub HTTP, a GitHub SDK, diffs, files, or source code.
 
 The provider matrix remains below rung 7 until owner OAuth consent is completed. No live provider response is claimed by the repository's mocked adapter tests.
+
+
+## Phase 3 invoice-preview boundary — 2026-11-05
+
+The application has an invoice preview/review layer, but the Stripe provider verification level remains rung 5. Wrekenfile references for Stripe invoice/customer methods remain evidence only: Stripe methods have not been enabled in `.swytchcode/tooling.json` or the runtime executor, no Stripe test tenant is connected, and no sandbox execution/idempotency behavior has been demonstrated. This implementation performs no Stripe API call. Do not raise the Stripe verification level or claim draft-invoice capability until the trusted-method change is human-reviewed and sandbox execution is recorded at rung 8.

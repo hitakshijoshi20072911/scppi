@@ -12,6 +12,7 @@ const navigation = [
   { href: '/app/contracts', label: 'Contracts', icon: '▣' },
   { href: '/app/records', label: 'Approved records', icon: '✓' },
   { href: '/app/evidence', label: 'Evidence & runs', icon: '↗' },
+  { href: '/app/invoices', label: 'Invoice review', icon: '▤' },
   { href: '/app/integrations', label: 'Integrations', icon: '◎' },
   { href: '/app/settings', label: 'Workspace settings', icon: '⊙' },
 ]

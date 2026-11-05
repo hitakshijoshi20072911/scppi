@@ -2960,6 +2960,46 @@ html.vp-booting {
 .vp-status-note {
   max-width: 22rem;
 }
+.invoice-review-panel {
+  margin-top: 1.2rem;
+}
+.record-row-button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.record-row-button:hover {
+  background: rgba(22, 123, 82, 0.08);
+}
+.invoice-review-panel code {
+  overflow-wrap: anywhere;
+  font-size: 0.78rem;
+}
+.invoice-review-actions {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+.invoice-review-actions label {
+  display: grid;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+.invoice-review-actions textarea {
+  min-height: 90px;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  resize: vertical;
+}
+.invoice-review-actions .record-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
 @media (max-width: 900px) {
   .vp-architecture {
     grid-template-columns: 1fr;
