@@ -1,0 +1,14 @@
+.vp-status-note {
+  color: var(--vp-dim);
+  font:
+    400 0.58rem Arial,
+    sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.vp-built-with {
+  color: var(--vp-lime) !important;
+  font: 700 0.6rem var(--vp-mono) !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
