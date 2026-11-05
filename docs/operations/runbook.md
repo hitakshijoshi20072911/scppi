@@ -22,9 +22,9 @@
 
 ## Render API service
 
-Use `render.yaml` as a starting Blueprint, then review the changes Render proposes. Configure `API_CORS_ORIGIN` to the exact HTTPS frontend origin and `DATABASE_URL` with the Supabase Session pooler string appropriate for the Render network. Keep credentials in Render's secret environment settings, not in the Blueprint or logs. The `/health/ready` endpoint should return a failure when production database connectivity is missing or unavailable.
+Use `render.yaml` as the Blueprint, then review the changes Render proposes. Configure `API_CORS_ORIGIN` to the exact HTTPS frontend origin, `DATABASE_URL` with the Supabase Session pooler string appropriate for the Render network, and `SWYTCHCODE_TOKEN` only after its approved OAuth connection is complete. Keep credentials in Render's secret environment settings, not in the Blueprint or logs. The `/health/ready` endpoint should return a failure when production database connectivity is missing or unavailable.
 
-The current Blueprint branch is `feat/foundation-0` and its free plan is only for smoke tests. Before production, merge reviewed code to `main`, change the service branch, choose a production-appropriate paid plan, and verify region and auto-deploy settings.
+The Blueprint branch is `main`; its free plan is only for smoke tests. Before production, choose a production-appropriate paid plan and verify region, auto-deploy settings, exact CORS origin, and secret values.
 
 ## Vercel frontend
 

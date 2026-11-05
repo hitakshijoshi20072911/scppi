@@ -3,7 +3,7 @@ services:
     name: vendorproof-api
     runtime: node
     plan: free # Smoke-test only; select an appropriate paid plan before production.
-    branch: feat/frontend-product-experience
+    branch: main
     buildCommand: npm ci --include=dev && npm run build:server
     startCommand: npm run start:api
     healthCheckPath: /health/ready
@@ -15,6 +15,8 @@ services:
       - key: API_CORS_ORIGIN
         sync: false
       - key: DATABASE_URL
+        sync: false
+      - key: SWYTCHCODE_TOKEN
         sync: false
       - key: LOG_LEVEL
         value: info

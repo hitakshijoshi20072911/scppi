@@ -1,6 +1,6 @@
 # VendorProof Production Preparation Guide
 
-**Status: preparation instructions only. No production provider accounts, services, domains, database, or credentials were created or tested.** This guide is for a human operator preparing Vercel, Render, and Supabase. It does not authorize live provider connections or financial actions.
+**Status: preparation and verification instructions.** The repository is merged to `main`, and public Vercel/Render smoke endpoints were observed on 2026-11-05. Provider-dashboard secrets, OAuth consent, and production readiness remain owner-controlled and are not inferred from those HTTP checks. This guide does not authorize live provider connections or financial actions.
 
 ## Deployment shape
 
@@ -12,7 +12,7 @@ See [`deployment.md`](deployment.md) for the architecture and [`operations/runbo
 
 ## Before creating production services
 
-1. Review the Phase 0 branch and its CI results. Merge only through a reviewed pull request. The checked-out branch is `feat/foundation-0`; production must not track this feature branch.
+1. Review `main` and its CI results. Merge only through a reviewed pull request; production must track `main`, not an old feature branch.
 2. Keep development, staging, and production separated. Use separate Supabase projects and secrets. Do not put real customer information in Preview deployments.
 3. Decide the desired region, service sizing, availability, recovery objective, domain names, monitoring ownership, and monthly budget. Recheck current plan limits and prices in the provider dashboards; this repository does not set or guarantee total cost.
 4. Do not enable Stripe, GitHub, Swytchcode, or other provider credentials yet. The integrations are not authenticated or verified for runtime use.
@@ -35,13 +35,14 @@ Do not point the current migration at a production database as a substitute for 
 ## 2. Prepare Render API service
 
 1. Connect the GitHub repository to Render and create a Blueprint from `render.yaml` on the reviewed branch. The current Blueprint defines only the API; it does not provision Supabase, a worker, or a database.
-2. For staging, the Blueprint currently follows `feat/foundation-0` and selects Render's `free` web-service plan to support smoke testing. This plan is not a production availability recommendation. Before production, merge the approved code to `main`, update the Blueprint branch to `main`, and select an appropriately sized paid plan and region.
+2. The Blueprint follows `main` and selects Render's `free` web-service plan for smoke testing. This plan is not a production availability recommendation; select an appropriately sized paid plan and region before production.
 3. Set the following environment values for the API service:
 
    - `NODE_ENV`: `production` for the production service.
    - `HOST`: `0.0.0.0`.
    - `API_CORS_ORIGIN`: the exact HTTPS Vercel production origin (for example `https://app.example.com`). Never use a wildcard with credentials.
    - `DATABASE_URL`: the Supabase Session pooler connection string, saved as a secret.
+   - `SWYTCHCODE_TOKEN`: the rotated Swytchcode service token, saved as a secret only after the approved GitHub OAuth connection is complete.
    - `LOG_LEVEL`: `info` unless a reviewed operational policy requires otherwise.
    - `PORT`: leave to Render's service environment; the app reads the supplied `PORT` and otherwise uses its local default.
 
