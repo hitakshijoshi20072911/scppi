@@ -1,8 +1,12 @@
 import { z } from 'zod'
 import type { ExecutorIdentity, SwytchcodeExecutor } from '../../swytchcode/executor.js'
 import {
+  githubCommitMetadataSchema,
+  githubPullCommitsGetInputSchema,
+  githubPullCommitsGetOutputSchema,
   githubPullGetInputSchema,
   githubPullGetOutputSchema,
+  type GithubCommitMetadata,
   githubPullRequestMetadataSchema,
   type GithubPullRequestMetadata,
 } from './schemas.js'
@@ -21,6 +25,10 @@ export type ListGithubPullRequestsInput = z.input<typeof listPullRequestsInputSc
 export interface ListGithubPullRequestsResult {
   readonly items: GithubPullRequestMetadata[]
   /** False only when the configured page bound was reached on a full page. */
+  readonly complete: boolean
+}
+export interface ListGithubPullRequestCommitsResult {
+  readonly items: GithubCommitMetadata[]
   readonly complete: boolean
 }
 
@@ -63,12 +71,49 @@ function metadataFromProvider(value: unknown): GithubPullRequestMetadata {
     updatedAt: parsed.data.updated_at,
     closedAt: parsed.data.closed_at,
     mergedAt: parsed.data.merged_at,
+    repositoryExternalId:
+      parsed.data.base?.repo.id === undefined ? undefined : String(parsed.data.base.repo.id),
   })
   if (!metadata.success) {
     throw new GithubAdapterError(
       'INVALID_PROVIDER_RESPONSE',
       'GitHub pull request metadata is invalid',
     )
+  }
+  return metadata.data
+}
+
+function commitMetadataFromProvider(value: unknown, pullRequestId: string): GithubCommitMetadata {
+  const parsed = githubPullCommitsGetOutputSchema.element.safeParse(value)
+  if (!parsed.success) {
+    throw new GithubAdapterError('INVALID_PROVIDER_RESPONSE', 'GitHub returned an invalid commit')
+  }
+  const message = parsed.data.commit.message.split(/\r?\n/, 1)[0]?.trim() || 'Commit'
+  const author =
+    parsed.data.author?.login ||
+    parsed.data.commit.author?.name ||
+    parsed.data.commit.author?.email ||
+    parsed.data.committer?.login ||
+    parsed.data.commit.committer?.name ||
+    parsed.data.commit.committer?.email ||
+    'unknown'
+  const timestamp =
+    parsed.data.commit.author?.date ||
+    parsed.data.commit.committer?.date ||
+    new Date(0).toISOString()
+  const metadata = githubCommitMetadataSchema.safeParse({
+    externalId: parsed.data.sha,
+    type: 'commit',
+    title: message.slice(0, 500),
+    state: 'committed',
+    author,
+    url: parsed.data.html_url,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    relatedPullRequestId: pullRequestId,
+  })
+  if (!metadata.success) {
+    throw new GithubAdapterError('INVALID_PROVIDER_RESPONSE', 'GitHub commit metadata is invalid')
   }
   return metadata.data
 }
@@ -127,6 +172,50 @@ export class GithubAdapter {
       }
     }
 
+    return { items, complete: false }
+  }
+
+  async listPullRequestCommits(
+    identity: ExecutorIdentity,
+    input: { owner: string; repo: string; pullNumber: number; pullRequestId: string },
+  ): Promise<ListGithubPullRequestCommitsResult> {
+    const items: GithubCommitMetadata[] = []
+    const perPage = 100
+    // GitHub documents a maximum of 250 commits for this endpoint. Three bounded
+    // pages avoid downloading diffs or source files.
+    for (let page = 1; page <= 3; page += 1) {
+      const requestInput = githubPullCommitsGetInputSchema.parse({
+        owner: input.owner,
+        repo: input.repo,
+        pull_number: input.pullNumber,
+        per_page: perPage,
+        page,
+      })
+      let response: unknown
+      try {
+        response = await this.executor.execute({
+          methodId: 'github.pull.commits.get',
+          input: requestInput,
+          identity,
+        })
+      } catch {
+        throw new GithubAdapterError(
+          'INVALID_PROVIDER_RESPONSE',
+          'GitHub commit read could not be completed',
+        )
+      }
+      const pageResult = githubPullCommitsGetOutputSchema.safeParse(response)
+      if (!pageResult.success || pageResult.data.length > perPage) {
+        throw new GithubAdapterError(
+          'INVALID_PROVIDER_RESPONSE',
+          'GitHub returned an invalid commit page',
+        )
+      }
+      for (const commit of pageResult.data) {
+        items.push(commitMetadataFromProvider(commit, input.pullRequestId))
+      }
+      if (pageResult.data.length < perPage) return { items, complete: true }
+    }
     return { items, complete: false }
   }
 }

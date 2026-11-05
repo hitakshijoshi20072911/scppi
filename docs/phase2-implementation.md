@@ -34,3 +34,14 @@ The new SQL migration is `server/src/db/migrations/0002_phase2_evidence_reconcil
 Most recent successful automated checks: `npm run typecheck` (server and web), `npm run test:unit` (35 tests across five files), `npm run lint`, `npm run format:check`, `npm run build`, and `npm run db:check`. `npm audit --omit=dev --audit-level=moderate` reports zero production vulnerabilities. Full `npm audit --audit-level=moderate` still reports four moderate development-tool advisories through Drizzle Kit's deprecated esbuild loader; `npm audit fix --force` proposes a breaking Drizzle Kit downgrade and was not applied.
 
 No live database migration, OAuth flow, Swytchcode executor call, or provider response was performed in this environment. The API’s default closed state and the `not_connected` mapping status are intentional safety behavior, not a claim of production readiness.
+
+
+## Stage 3 completion status — 2026-11-05
+
+The default executor remains fail-closed when `SWYTCHCODE_TOKEN` is missing. When configured, the server now uses the installed `@swytchcode/runtime` `exec()` transport with the authenticated workspace ID passed unchanged as `tenantId`. Provider input is converted to the SDK's declared string-valued `params` shape, and the existing allowlist, bounded input validation, sanitized errors, and audit wrapper remain in force.
+
+Workspace GitHub connection routes now initiate a one-time Swytchcode OAuth link, verify consent and repository access through the approved `github.pull.get` read, mark the source connected only after that verification succeeds, and revoke the workspace tenant connection through the official `disconnect()` API. The tenant is always derived server-side from the authenticated workspace route context; no browser-provided workspace identifier is accepted.
+
+Commit ingestion now uses the verified `github.pull.commits.get` method with a bounded three-page read per pull request, persists SHA, sanitized subject, author, timestamps, URL, source workspace, source connection, and the related pull-request external ID, and deduplicates through the existing source/provider/external-ID key. It does not download diffs or convert commits into hours. The additive schema is in `0003_commit_provenance.sql`.
+
+Live Swytchcode execution, OAuth consent, PostgreSQL migration application, effective-role RLS behavior, and live GitHub reads remain unclaimed in this sandbox because no token, database URL, PostgreSQL client/server, or owner consent was available. Mocked tests and static checks are not live integration evidence.

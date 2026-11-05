@@ -61,6 +61,10 @@ const githubPullRequestListItemSchema = z.object({
   updated_at: z.iso.datetime(),
   closed_at: z.iso.datetime().nullable(),
   merged_at: z.iso.datetime().nullable(),
+  base: z
+    .object({ repo: z.object({ id: z.number().int().nonnegative() }).passthrough() })
+    .passthrough()
+    .optional(),
 })
 
 /**
@@ -81,8 +85,55 @@ export const githubPullRequestMetadataSchema = z
     updatedAt: z.iso.datetime(),
     closedAt: z.iso.datetime().nullable(),
     mergedAt: z.iso.datetime().nullable(),
+    repositoryExternalId: z.string().max(200).optional(),
+  })
+  .strict()
+
+const gitUserSchema = z
+  .object({
+    name: z.string().max(300).nullable().optional(),
+    email: z.string().max(320).nullable().optional(),
+    date: z.iso.datetime().nullable().optional(),
+  })
+  .passthrough()
+
+const commitSchema = z.object({
+  url: z.string().url(),
+  sha: z.string().trim().min(1).max(200),
+  html_url: githubUrl,
+  commit: z
+    .object({
+      author: gitUserSchema.nullable(),
+      committer: gitUserSchema.nullable(),
+      message: z.string().trim().min(1).max(10000),
+    })
+    .passthrough(),
+  author: z
+    .object({ login: z.string().trim().min(1).max(100) })
+    .passthrough()
+    .nullable(),
+  committer: z
+    .object({ login: z.string().trim().min(1).max(100) })
+    .passthrough()
+    .nullable(),
+})
+
+export const githubPullCommitsGetOutputSchema = z.array(commitSchema)
+
+export const githubCommitMetadataSchema = z
+  .object({
+    externalId: z.string().min(1).max(200),
+    type: z.literal('commit'),
+    title: z.string().trim().min(1).max(500),
+    state: z.literal('committed'),
+    author: z.string().trim().min(1).max(320),
+    url: githubUrl,
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+    relatedPullRequestId: z.string().min(1).max(200),
   })
   .strict()
 
 export type GithubPullGetInput = z.infer<typeof githubPullGetInputSchema>
 export type GithubPullRequestMetadata = z.infer<typeof githubPullRequestMetadataSchema>
+export type GithubCommitMetadata = z.infer<typeof githubCommitMetadataSchema>

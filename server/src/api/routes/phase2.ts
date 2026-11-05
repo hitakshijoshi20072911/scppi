@@ -2,6 +2,10 @@ import { createHash } from 'node:crypto'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { TransactionSql } from 'postgres'
 import { z } from 'zod'
+import {
+  connect as swytchcodeConnect,
+  disconnect as swytchcodeDisconnect,
+} from '@swytchcode/runtime'
 import { getDatabase } from '../../db/client.js'
 import { createAuditedSwytchcodeExecutor } from '../../db/repositories/provider-execution.js'
 import { config } from '../../platform/config.js'
@@ -19,6 +23,7 @@ import { GithubAdapter } from '../../providers/github/adapter.js'
 import { unavailableExecutor, type SwytchcodeExecutor } from '../../swytchcode/executor.js'
 const uuid = z.string().uuid()
 const paramsSchema = z.object({ workspaceId: uuid, projectId: uuid }).strict()
+const sourceParamsSchema = z.object({ workspaceId: uuid, projectId: uuid, sourceId: uuid }).strict()
 const contractParamsSchema = z
   .object({ workspaceId: uuid, projectId: uuid, contractId: uuid })
   .strict()
@@ -244,6 +249,100 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
     },
   )
 
+  app.post(
+    '/api/v1/workspaces/:workspaceId/projects/:projectId/sources/:sourceId/connect',
+    async (request, reply) => {
+      const { workspaceId, projectId, sourceId } = parse(sourceParamsSchema, request.params)
+      const { auth } = await requireContext(request, workspaceId, 'write')
+      if (!config.SWYTCHCODE_TOKEN)
+        fail(503, 'SWYTCHCODE_NOT_CONFIGURED', 'Swytchcode is not configured on this server')
+      const source = await withWorkspace(workspaceId, async (tx) => {
+        const [row] =
+          await tx`select id, provider, repository_owner, repository_name, connection_status from source_connection where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${sourceId}`
+        if (!row) fail(404, 'NOT_FOUND', 'Repository source not found')
+        if (row.connection_status === 'disabled')
+          fail(409, 'SOURCE_DISABLED', 'Disabled repository sources cannot be connected')
+        return row
+      })
+      try {
+        const result = swytchcodeConnect({ provider: source.provider, tenantId: workspaceId })
+        await withWorkspace(
+          workspaceId,
+          async (tx) =>
+            tx`insert into audit_event (workspace_id, actor_user_id, action, entity_type, entity_id, after_data, request_id) values (${workspaceId}, ${auth.userId}, 'source.connection_initiated', 'source_connection', ${source.id}, ${JSON.stringify({ provider: source.provider, repository: `${source.repository_owner}/${source.repository_name}` })}, ${safeCorrelationId(request)})`,
+        )
+        return ok(reply, { url: result.url, expiresInSeconds: 600 })
+      } catch {
+        fail(503, 'SWYTCHCODE_CONNECTION_FAILED', 'GitHub connection could not be started')
+      }
+    },
+  )
+
+  app.post(
+    '/api/v1/workspaces/:workspaceId/projects/:projectId/sources/:sourceId/verify',
+    async (request, reply) => {
+      const { workspaceId, projectId, sourceId } = parse(sourceParamsSchema, request.params)
+      const { auth } = await requireContext(request, workspaceId, 'write')
+      const source = await withWorkspace(workspaceId, async (tx) => {
+        const [row] =
+          await tx`select id, provider, repository_owner, repository_name, connection_status from source_connection where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${sourceId}`
+        if (!row) fail(404, 'NOT_FOUND', 'Repository source not found')
+        if (row.connection_status === 'disabled')
+          fail(409, 'SOURCE_DISABLED', 'Disabled repository sources cannot be verified')
+        return row
+      })
+      try {
+        await new GithubAdapter(
+          createAuditedSwytchcodeExecutor(providerExecutor, source.id),
+        ).listPullRequests(
+          { workspaceId },
+          { owner: source.repository_owner, repo: source.repository_name, perPage: 1, maxPages: 1 },
+        )
+      } catch {
+        fail(
+          409,
+          'GITHUB_VERIFICATION_FAILED',
+          'GitHub consent or repository access is not verified',
+        )
+      }
+      const updated = await withWorkspace(workspaceId, async (tx) => {
+        const [row] =
+          await tx`update source_connection set connection_status = 'connected', connected_at = coalesce(connected_at, now()), updated_at = now() where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${sourceId} returning id, provider, repository_owner, repository_name, repository_url, connection_status, connected_at, updated_at`
+        await tx`insert into audit_event (workspace_id, actor_user_id, action, entity_type, entity_id, after_data, request_id) values (${workspaceId}, ${auth.userId}, 'source.connection_verified', 'source_connection', ${sourceId}, ${JSON.stringify({ provider: 'github', verification: 'read_repository' })}, ${safeCorrelationId(request)})`
+        return row
+      })
+      return ok(reply, updated)
+    },
+  )
+
+  app.post(
+    '/api/v1/workspaces/:workspaceId/projects/:projectId/sources/:sourceId/disconnect',
+    async (request, reply) => {
+      const { workspaceId, projectId, sourceId } = parse(sourceParamsSchema, request.params)
+      const { auth } = await requireContext(request, workspaceId, 'write')
+      const source = await withWorkspace(workspaceId, async (tx) => {
+        const [row] =
+          await tx`select id, provider, connection_status from source_connection where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${sourceId}`
+        if (!row) fail(404, 'NOT_FOUND', 'Repository source not found')
+        return row
+      })
+      if (config.SWYTCHCODE_TOKEN) {
+        try {
+          swytchcodeDisconnect({ provider: source.provider, tenantId: workspaceId })
+        } catch {
+          fail(503, 'SWYTCHCODE_DISCONNECT_FAILED', 'GitHub connection could not be revoked')
+        }
+      }
+      const updated = await withWorkspace(workspaceId, async (tx) => {
+        const [row] =
+          await tx`update source_connection set connection_status = 'not_connected', connected_at = null, updated_at = now() where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${sourceId} returning id, provider, repository_owner, repository_name, repository_url, connection_status, connected_at, updated_at`
+        await tx`insert into audit_event (workspace_id, actor_user_id, action, entity_type, entity_id, after_data, request_id) values (${workspaceId}, ${auth.userId}, 'source.connection_revoked', 'source_connection', ${sourceId}, ${JSON.stringify({ provider: source.provider })}, ${safeCorrelationId(request)})`
+        return row
+      })
+      return ok(reply, updated)
+    },
+  )
+
   app.put(
     '/api/v1/workspaces/:workspaceId/projects/:projectId/contracts/:contractId/scope-rules',
     async (request, reply) => {
@@ -446,15 +545,41 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
             },
           )
           const inPeriod = result.items.filter((item) => isInPeriod(item.createdAt, start, end))
+          const github = new GithubAdapter(
+            createAuditedSwytchcodeExecutor(providerExecutor, source.id),
+          )
+          const commits = []
+          let commitsComplete = true
+          for (const pullRequest of inPeriod) {
+            const commitResult = await github.listPullRequestCommits(
+              { workspaceId },
+              {
+                owner: source.repository_owner,
+                repo: source.repository_name,
+                pullNumber: Number(pullRequest.externalId),
+                pullRequestId: pullRequest.externalId,
+              },
+            )
+            commits.push(
+              ...commitResult.items.filter((item) => isInPeriod(item.createdAt, start, end)),
+            )
+            commitsComplete = commitsComplete && commitResult.complete
+          }
+          const importedItems = [...inPeriod, ...commits]
           await withWorkspace(workspaceId, async (tx) => {
-            for (const item of inPeriod) {
+            for (const item of importedItems) {
               const hash = evidenceHash(item)
-              await tx`insert into work_item (workspace_id, project_id, source_connection_id, provider, external_id, item_type, title, state, author, source_url, provider_created_at, provider_updated_at, content_hash) values (${workspaceId}, ${projectId}, ${source.id}, 'github', ${item.externalId}, ${item.type}, ${item.title}, ${item.state}, ${item.author}, ${item.url}, ${item.createdAt}, ${item.updatedAt}, ${hash}) on conflict (workspace_id, source_connection_id, provider, external_id) do update set title = excluded.title, state = excluded.state, author = excluded.author, source_url = excluded.source_url, provider_created_at = excluded.provider_created_at, provider_updated_at = excluded.provider_updated_at, content_hash = excluded.content_hash, last_seen_at = now(), updated_at = now() where work_item.content_hash <> excluded.content_hash`
+              const relatedExternalId =
+                'relatedPullRequestId' in item ? item.relatedPullRequestId : null
+              const repositoryExternalId =
+                'repositoryExternalId' in item ? (item.repositoryExternalId ?? null) : null
+              await tx`insert into work_item (workspace_id, project_id, source_connection_id, provider, external_id, item_type, title, state, author, source_url, provider_created_at, provider_updated_at, content_hash, related_external_id, repository_external_id) values (${workspaceId}, ${projectId}, ${source.id}, 'github', ${item.externalId}, ${item.type}, ${item.title}, ${item.state}, ${item.author}, ${item.url}, ${item.createdAt}, ${item.updatedAt}, ${hash}, ${relatedExternalId}, ${repositoryExternalId}) on conflict (workspace_id, source_connection_id, provider, external_id) do update set title = excluded.title, state = excluded.state, author = excluded.author, source_url = excluded.source_url, provider_created_at = excluded.provider_created_at, provider_updated_at = excluded.provider_updated_at, content_hash = excluded.content_hash, related_external_id = excluded.related_external_id, repository_external_id = excluded.repository_external_id, last_seen_at = now(), updated_at = now() where work_item.content_hash <> excluded.content_hash`
             }
-            await tx`update run_source set status = ${result.complete ? 'succeeded' : 'failed'}, items_received = ${inPeriod.length}, error_code = ${result.complete ? null : 'PAGE_LIMIT_REACHED'}, completed_at = now() where workspace_id = ${workspaceId} and run_id = ${runId} and source_connection_id = ${source.id}`
+            const complete = result.complete && commitsComplete
+            await tx`update run_source set status = ${complete ? 'succeeded' : 'failed'}, items_received = ${importedItems.length}, error_code = ${complete ? null : 'PAGE_LIMIT_REACHED'}, completed_at = now() where workspace_id = ${workspaceId} and run_id = ${runId} and source_connection_id = ${source.id}`
           })
-          itemsImported += inPeriod.length
-          if (result.complete) successfulSources += 1
+          itemsImported += importedItems.length
+          if (result.complete && commitsComplete) successfulSources += 1
           else failedSources += 1
         } catch {
           failedSources += 1
@@ -566,16 +691,41 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
             snapshot.run.time_zone,
           )
           const inPeriod = readResult.items.filter((item) => isInPeriod(item.createdAt, start, end))
+          const github = new GithubAdapter(
+            createAuditedSwytchcodeExecutor(providerExecutor, snapshot.source.id),
+          )
+          const commits = []
+          let commitsComplete = true
+          for (const pullRequest of inPeriod) {
+            const commitResult = await github.listPullRequestCommits(
+              { workspaceId },
+              {
+                owner: snapshot.source.repository_owner,
+                repo: snapshot.source.repository_name,
+                pullNumber: Number(pullRequest.externalId),
+                pullRequestId: pullRequest.externalId,
+              },
+            )
+            commits.push(
+              ...commitResult.items.filter((item) => isInPeriod(item.createdAt, start, end)),
+            )
+            commitsComplete = commitsComplete && commitResult.complete
+          }
+          const importedItems = [...inPeriod, ...commits]
           await withWorkspace(workspaceId, async (tx) => {
-            for (const item of inPeriod) {
+            for (const item of importedItems) {
               const hash = evidenceHash(item)
-              await tx`insert into work_item (workspace_id, project_id, source_connection_id, provider, external_id, item_type, title, state, author, source_url, provider_created_at, provider_updated_at, content_hash) values (${workspaceId}, ${projectId}, ${snapshot.source.id}, 'github', ${item.externalId}, ${item.type}, ${item.title}, ${item.state}, ${item.author}, ${item.url}, ${item.createdAt}, ${item.updatedAt}, ${hash}) on conflict (workspace_id, source_connection_id, provider, external_id) do update set title = excluded.title, state = excluded.state, author = excluded.author, source_url = excluded.source_url, provider_created_at = excluded.provider_created_at, provider_updated_at = excluded.provider_updated_at, content_hash = excluded.content_hash, last_seen_at = now(), updated_at = now() where work_item.content_hash <> excluded.content_hash`
+              const relatedExternalId =
+                'relatedPullRequestId' in item ? item.relatedPullRequestId : null
+              const repositoryExternalId =
+                'repositoryExternalId' in item ? (item.repositoryExternalId ?? null) : null
+              await tx`insert into work_item (workspace_id, project_id, source_connection_id, provider, external_id, item_type, title, state, author, source_url, provider_created_at, provider_updated_at, content_hash, related_external_id, repository_external_id) values (${workspaceId}, ${projectId}, ${snapshot.source.id}, 'github', ${item.externalId}, ${item.type}, ${item.title}, ${item.state}, ${item.author}, ${item.url}, ${item.createdAt}, ${item.updatedAt}, ${hash}, ${relatedExternalId}, ${repositoryExternalId}) on conflict (workspace_id, source_connection_id, provider, external_id) do update set title = excluded.title, state = excluded.state, author = excluded.author, source_url = excluded.source_url, provider_created_at = excluded.provider_created_at, provider_updated_at = excluded.provider_updated_at, content_hash = excluded.content_hash, related_external_id = excluded.related_external_id, repository_external_id = excluded.repository_external_id, last_seen_at = now(), updated_at = now() where work_item.content_hash <> excluded.content_hash`
             }
-            await tx`update run_source set items_received = ${inPeriod.length} where workspace_id = ${workspaceId} and run_id = ${runId} and source_connection_id = ${body.sourceId}`
+            await tx`update run_source set items_received = ${importedItems.length} where workspace_id = ${workspaceId} and run_id = ${runId} and source_connection_id = ${body.sourceId}`
           })
-          imported = inPeriod.length
-          sourceReadComplete = readResult.complete
-          if (!readResult.complete) errorCode = 'PAGE_LIMIT_REACHED'
+          imported = importedItems.length
+          sourceReadComplete = readResult.complete && commitsComplete
+          if (!sourceReadComplete) errorCode = 'PAGE_LIMIT_REACHED'
         } catch {
           errorCode = 'PROVIDER_READ_FAILED'
         }

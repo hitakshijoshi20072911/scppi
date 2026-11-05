@@ -286,3 +286,12 @@ c:\swytchcode\
 - A root npm workspace lockfile was generated for the Phase 0 branch. The prior nested `server/package-lock.json` was removed to avoid competing lockfiles.
 - GitHub and Stripe bundles remain downloaded in `.swytchcode/integrations/`; tooling still has no enabled tools and no provider calls were made.
 - Vercel/Render deployment configuration is prepared in `apps/web/vercel.json` and `render.yaml`; no external hosting account was connected or deployed.
+
+
+## Stage 3 verification update — 2026-11-05
+
+The installed runtime package is `@swytchcode/runtime@1.2.1`. Its declarations expose `exec`, `connect`, `disconnect`, `saveKey`, and `saveCredentials`; VendorProof uses only `exec`, `connect`, and `disconnect` for this GitHub workflow. Official multi-tenant guidance confirms that tenant IDs must come from the server session, tenant calls never fall back to the developer account, and OAuth links are created on demand and used once.
+
+The current sandbox has no `DATABASE_URL`, `STAGING_DATABASE_URL`, or `TEST_DATABASE_URL` value and no `psql`, Docker, or PostgreSQL server binary. No live Swytchcode token or owner GitHub OAuth consent was available for a provider call. The final automated unit suite has 36 passing tests, and static type, lint, formatting, database metadata, and production build checks pass.
+
+Migration `0003_commit_provenance.sql` is additive and was not applied to staging because PostgreSQL access was unavailable. No staging database was reset or modified.

@@ -80,3 +80,10 @@ These are not changes to the approved architecture but implementation scaffoldin
 ---
 
 **Document status:** Initial decisions recorded. Revisit conditions documented.
+
+
+## Stage 3 decisions — 2026-11-05
+
+The authenticated VendorProof workspace ID is passed unchanged as Swytchcode `tenantId`. Connection URLs are created server-side, and a source becomes connected only after a server-side read verifies consent and repository access. Disconnect uses the official Runtime SDK and clears local state. Commit evidence is persisted as evidence only; it never becomes hours or billing amounts.
+
+Forced RLS is not considered certified until migrations are applied to a disposable PostgreSQL database and cross-tenant tests run under the restricted application role. A superuser or role with `rolbypassrls` cannot provide certification evidence.
