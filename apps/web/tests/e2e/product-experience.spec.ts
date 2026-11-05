@@ -8,6 +8,16 @@ test('landing page exposes product entry points and honest API status', async ({
   await expect(page.getByText(/Built with Swytchcode/i)).toBeVisible()
 })
 
+test('landing page advances through the dynamic product scenes while scrolling', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.evaluate(() => window.scrollTo({ top: 2200, behavior: 'instant' }))
+  await expect(page.getByText(/Product intelligence/i)).toBeVisible()
+  await page.evaluate(() => window.scrollTo({ top: 5600, behavior: 'instant' }))
+  await expect(page.getByText(/Live product model/i)).toBeVisible()
+})
+
 test('free demo is deterministic, interactive, and clearly fictional', async ({ page }) => {
   await page.goto('/demo')
   await expect(page.getByRole('heading', { name: /See the proof chain/i })).toBeVisible()
