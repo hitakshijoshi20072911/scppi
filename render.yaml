@@ -3,7 +3,7 @@ services:
     name: vendorproof-api
     runtime: node
     plan: free # Smoke-test only; select an appropriate paid plan before production.
-    branch: feat/foundation-0
+    branch: feat/frontend-product-experience
     buildCommand: npm ci --include=dev && npm run build:server
     startCommand: npm run start:api
     healthCheckPath: /health/ready
