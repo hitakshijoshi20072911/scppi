@@ -44,9 +44,15 @@ export function createSwytchcodeRuntimeTransport(): SwytchcodeTransport | undefi
 
   return {
     async execute(request) {
+      const params = Object.fromEntries(
+        Object.entries(request.input).map(([key, value]) => [
+          key,
+          value === null ? '' : String(value),
+        ]),
+      )
       return swytchcodeExec(
         request.methodId,
-        { params: request.input as Record<string, string> },
+        { params },
         { tenantId: request.identity.workspaceId, timeoutMs: runtimeTimeoutMs },
       )
     },

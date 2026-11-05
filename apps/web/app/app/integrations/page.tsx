@@ -22,7 +22,14 @@ export default function IntegrationsPage() {
       .then(async (rows) => {
         setProjects(rows)
         const all = await Promise.all(rows.map((project) => api.sources(String(project.id))))
-        setSources(all.flat())
+        setSources(
+          all.flatMap((projectSources, index) =>
+            projectSources.map((source) => ({
+              ...source,
+              project_id: String(rows[index]?.id),
+            })),
+          ),
+        )
       })
       .catch((cause) =>
         setError(
@@ -47,6 +54,54 @@ export default function IntegrationsPage() {
       load()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Repository could not be mapped.')
+    } finally {
+      setPending(false)
+    }
+  }
+  async function connectSource(source: RecordRow) {
+    if (!activeWorkspace || !source.id || !source.project_id) return
+    const popup = window.open('', 'vendorproof-github-connect', 'width=520,height=720')
+    setError(null)
+    try {
+      const result = await workspaceApi(activeWorkspace.id).connectSource(
+        String(source.project_id),
+        String(source.id),
+      )
+      if (popup) popup.location.href = result.url
+      else window.location.href = result.url
+    } catch (cause) {
+      popup?.close()
+      setError(cause instanceof Error ? cause.message : 'GitHub connection could not be started.')
+    }
+  }
+  async function verifySource(source: RecordRow) {
+    if (!activeWorkspace || !source.id || !source.project_id) return
+    setPending(true)
+    setError(null)
+    try {
+      await workspaceApi(activeWorkspace.id).verifySource(
+        String(source.project_id),
+        String(source.id),
+      )
+      load()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'GitHub access could not be verified.')
+    } finally {
+      setPending(false)
+    }
+  }
+  async function disconnectSource(source: RecordRow) {
+    if (!activeWorkspace || !source.id || !source.project_id) return
+    setPending(true)
+    setError(null)
+    try {
+      await workspaceApi(activeWorkspace.id).disconnectSource(
+        String(source.project_id),
+        String(source.id),
+      )
+      load()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'GitHub connection could not be revoked.')
     } finally {
       setPending(false)
     }
@@ -91,9 +146,37 @@ export default function IntegrationsPage() {
                     </strong>
                     <small>Project source · last sync unavailable until provider auth</small>
                   </div>
-                  <span className="record-status">
-                    {String(source.connection_status ?? 'not_connected')}
-                  </span>
+                  <div className="record-actions">
+                    <span className="record-status">
+                      {String(source.connection_status ?? 'not_connected')}
+                    </span>
+                    {source.connection_status === 'connected' ? (
+                      <button
+                        className="button button-ghost"
+                        disabled={pending}
+                        onClick={() => disconnectSource(source)}
+                      >
+                        Disconnect
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          className="button button-ghost"
+                          disabled={pending}
+                          onClick={() => connectSource(source)}
+                        >
+                          Connect GitHub
+                        </button>
+                        <button
+                          className="button button-ghost"
+                          disabled={pending}
+                          onClick={() => verifySource(source)}
+                        >
+                          Verify access
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))
             ) : (

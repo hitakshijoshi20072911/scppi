@@ -288,3 +288,69 @@ describe('GitHub pull request adapter', () => {
     expect(executor.execute).not.toHaveBeenCalled()
   })
 })
+
+describe('GitHub commit adapter', () => {
+  it('imports sanitized commit metadata through github.pull.commits.get and preserves the PR relationship', async () => {
+    const calls: ValidatedSwytchcodeExecutionRequest[] = []
+    const executor: SwytchcodeExecutor = {
+      execute: vi.fn(async (request) => {
+        calls.push(request as ValidatedSwytchcodeExecutionRequest)
+        return request.input.page === 1
+          ? [
+              {
+                url: 'https://api.github.com/repos/octocat/Hello-World/commits/abc123',
+                sha: 'abc123',
+                html_url: 'https://github.com/octocat/Hello-World/commit/abc123',
+                commit: {
+                  author: {
+                    name: 'Octo Cat',
+                    email: 'octo@example.com',
+                    date: '2026-10-01T12:00:00Z',
+                  },
+                  committer: {
+                    name: 'Octo Cat',
+                    email: 'octo@example.com',
+                    date: '2026-10-01T12:00:00Z',
+                  },
+                  message: 'Implement evidence ingestion\n\nDetails must not be stored.',
+                },
+                author: { login: 'octocat' },
+                committer: { login: 'octocat' },
+                files: [{ filename: 'private.ts', patch: 'secret' }],
+              },
+            ]
+          : []
+      }),
+    }
+    const result = await new GithubAdapter(executor).listPullRequestCommits(identity, {
+      owner: 'octocat',
+      repo: 'Hello-World',
+      pullNumber: 42,
+      pullRequestId: '42',
+    })
+    expect(result.complete).toBe(true)
+    expect(result.items).toEqual([
+      {
+        externalId: 'abc123',
+        type: 'commit',
+        title: 'Implement evidence ingestion',
+        state: 'committed',
+        author: 'octocat',
+        url: 'https://github.com/octocat/Hello-World/commit/abc123',
+        createdAt: '2026-10-01T12:00:00Z',
+        updatedAt: '2026-10-01T12:00:00Z',
+        relatedPullRequestId: '42',
+      },
+    ])
+    expect(calls.map((call) => call.methodId)).toEqual(['github.pull.commits.get'])
+    expect(calls[0]?.input).toEqual({
+      owner: 'octocat',
+      repo: 'Hello-World',
+      pull_number: 42,
+      per_page: 100,
+      page: 1,
+    })
+    expect(calls.every((call) => call.identity.workspaceId === identity.workspaceId)).toBe(true)
+    expect(result.items[0]).not.toHaveProperty('files')
+  })
+})

@@ -191,6 +191,21 @@ export function workspaceApi(workspaceId: string) {
         body,
         retry: false,
       }),
+    connectSource: (projectId: string, sourceId: string) =>
+      apiRequest<{ url: string; expiresInSeconds: number }>(
+        `/api/v1/workspaces/${workspaceId}/projects/${projectId}/sources/${sourceId}/connect`,
+        { method: 'POST', retry: false },
+      ),
+    verifySource: (projectId: string, sourceId: string) =>
+      apiRequest<RecordRow>(
+        `/api/v1/workspaces/${workspaceId}/projects/${projectId}/sources/${sourceId}/verify`,
+        { method: 'POST', retry: false },
+      ),
+    disconnectSource: (projectId: string, sourceId: string) =>
+      apiRequest<RecordRow>(
+        `/api/v1/workspaces/${workspaceId}/projects/${projectId}/sources/${sourceId}/disconnect`,
+        { method: 'POST', retry: false },
+      ),
     runs: {
       create: (projectId: string, body: { periodStart: string; periodEnd: string }) =>
         apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/runs`, {

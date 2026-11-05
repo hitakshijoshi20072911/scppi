@@ -268,3 +268,14 @@ A provider counts at the highest rung actually reached, and nothing above it may
 ---
 
 **Document status:** Canonical method verification and method enablement are recorded. Authentication and rung-8 execution verification remain pending owner OAuth consent; do not treat the mocked adapter tests as provider execution evidence.
+
+
+## Stage 3 runtime and workspace OAuth update — 2026-11-05
+
+The installed runtime is `@swytchcode/runtime@1.2.1`. The supported server APIs verified from the installed declarations and official documentation are `exec(canonicalId, { params }, { tenantId, timeoutMs })` for provider reads, `connect({ provider, tenantId })` for a one-time OAuth URL, and `disconnect({ provider, tenantId })` for revocation.
+
+VendorProof uses the authenticated workspace ID unchanged as `tenantId`. It never accepts a tenant identifier from request bodies, query strings, headers, or provider payloads. The owner-level provider setup remains `swy auth connect github`; it must be performed once by the Swytchcode project owner and was not repeated automatically.
+
+The exact verified GitHub read IDs remain `github.pull.get`, `github.pull.commits.get`, `github.pull.get1`, and `github.commit.get2`. Commit ingestion uses `github.pull.commits.get` with `owner`, `repo`, `pull_number`, `per_page`, and `page`, and retains only SHA, commit subject, allowed author metadata, timestamps, URL, and the related PR identifier. It does not use direct GitHub HTTP, a GitHub SDK, diffs, files, or source code.
+
+The provider matrix remains below rung 7 until owner OAuth consent is completed. No live provider response is claimed by the repository's mocked adapter tests.

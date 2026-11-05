@@ -110,3 +110,12 @@ The workspace now supports live clients, projects, contracts, time entries, mile
 - [Render background workers](https://render.com/docs/background-workers)
 - [Supabase PostgreSQL connection methods](https://supabase.com/docs/guides/database/connecting-to-postgres)
 - [Supabase database backups](https://supabase.com/docs/guides/platform/backups)
+
+
+## Stage 3 provider and database deployment gate
+
+Before enabling a live GitHub source, the Swytchcode project owner must complete the one-time provider setup with `swy auth connect github`. This owner-level action must not be repeated by application requests. The server must have `SWYTCHCODE_TOKEN` configured and must use the official Runtime SDK transport.
+
+A workspace administrator maps a repository, clicks Connect, opens the returned one-time OAuth link, and then invokes Verify. The application marks the source `connected` only after the authenticated workspace tenant performs a bounded read-only repository check. If consent or access is missing, the source stays `not_connected` and the error is sanitized.
+
+Apply `server/src/db/migrations/0003_commit_provenance.sql` additively only after the complete migration chain passes against a disposable PostgreSQL database and effective-role RLS tests. Do not reset staging. The current sandbox did not apply this migration because it had no database URL or PostgreSQL tooling.

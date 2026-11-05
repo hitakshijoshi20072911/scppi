@@ -46,3 +46,12 @@ Before a deploy, run the repository quality workflow and review any migration. D
 - After rollback, check API readiness, frontend/API CORS, data consistency, and logs before reopening traffic.
 
 For the full provider setup sequence and current go-live blockers, see [`../production-setup.md`](../production-setup.md).
+
+
+## Stage 3 GitHub connection operations
+
+Use the VendorProof Integrations surface to map a repository and request a fresh connection URL. The URL is one-time and short-lived; do not copy it into tickets or shared channels. After the owner completes consent, run Verify for the same mapped source. Only a successful server-side read changes the state to `connected`.
+
+If the URL fails, generate a new one rather than retrying an expired URL. If verification returns a sanitized access or consent error, leave the source disconnected and check the owner-level setup with `swy auth status` and the one-time setup command `swy auth connect github`. Never substitute the developer's GitHub identity.
+
+Disconnect uses the official Runtime SDK and clears the local source state. Reconciliation marks disconnected sources as provider failures; it never invents evidence or billing time. PostgreSQL/RLS incidents must be investigated using the restricted application role and transaction-local `app.workspace_id`; do not certify tests run as a superuser or role with `rolbypassrls`.
