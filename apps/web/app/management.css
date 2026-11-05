@@ -1,0 +1,114 @@
+.panel-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+}
+.table-search {
+  width: min(240px, 100%);
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+.record-table {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+.record-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.record-row strong,
+.record-row small {
+  display: block;
+}
+.record-row small {
+  margin-top: 0.3rem;
+  color: var(--muted);
+}
+.record-status {
+  padding: 0.35rem 0.55rem;
+  color: var(--emerald);
+  border: 1px solid rgba(22, 123, 82, 0.25);
+  border-radius: 999px;
+  font: 700 0.62rem monospace;
+  text-transform: uppercase;
+}
+.modal-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(8, 11, 9, 0.62);
+}
+.modal-card {
+  position: relative;
+  width: min(100%, 520px);
+  padding: 2rem;
+  border-radius: 16px;
+  background: var(--paper);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+}
+.modal-card h2 {
+  margin: 0 0 1.5rem;
+  font-size: 2rem;
+  letter-spacing: -0.06em;
+}
+.modal-card label {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.modal-card input,
+.modal-card textarea,
+.modal-card select {
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+}
+.modal-card textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  border: 0;
+  background: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+.alert button {
+  margin-left: 0.75rem;
+  border: 0;
+  background: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+@media (max-width: 640px) {
+  .panel-toolbar {
+    display: block;
+  }
+  .table-search {
+    margin-top: 1rem;
+  }
+  .record-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .record-status {
+    align-self: flex-start;
+  }
+}

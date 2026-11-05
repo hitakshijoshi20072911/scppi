@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/components/auth-provider'
+import { LenisProvider } from '@/components/lenis-provider'
 
 export const metadata: Metadata = {
   title: 'VendorProof — Verified work. Traceable invoices.',
@@ -11,7 +12,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <LenisProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </LenisProvider>
       </body>
     </html>
   )
