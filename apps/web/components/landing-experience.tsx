@@ -225,8 +225,8 @@ function ScrollStatement() {
     <section className="vp-statement" ref={root}>
       <span className="vp-section-label">01 / THE GAP</span>
       <p aria-label={copy}>
-        {copy.split(' ').map((word) => (
-          <span className="vp-word" key={word}>
+        {copy.split(' ').map((word, index) => (
+          <span className="vp-word" key={`${word}-${index}`}>
             {word}&nbsp;
           </span>
         ))}
@@ -294,19 +294,50 @@ function ProblemScene() {
 
 function WorkflowScene() {
   const root = useRef<HTMLElement>(null)
+  const art = useRef<HTMLDivElement>(null)
   const [stage, setStage] = useState(0)
   useEffect(() => {
     const ctx = gsap.context(() => {
       const mm = gsap.matchMedia()
       mm.add('(prefers-reduced-motion: no-preference) and (min-width: 900px)', () => {
-        const st = ScrollTrigger.create({
-          trigger: root.current,
-          start: 'top top',
-          end: '+=360%',
-          pin: true,
-          onUpdate: (self) => setStage(Math.min(3, Math.floor(self.progress * 4))),
+        const cards = gsap.utils.toArray<HTMLElement>('.vp-art-card')
+        const connectors = gsap.utils.toArray<SVGPathElement>('.vp-workflow-connector')
+        gsap.set(cards, { transformOrigin: '50% 50%', willChange: 'transform,opacity' })
+        gsap.set(cards[0], { opacity: 1, scale: 1, x: 0, y: 0, rotate: -5 })
+        gsap.set(cards[1], { opacity: 0, scale: 0.82, x: 90, y: -30, rotate: 12 })
+        gsap.set(cards[2], { opacity: 0, scale: 0.82, x: -100, y: 45, rotate: -12 })
+        gsap.set(cards[3], { opacity: 0, scale: 0.82, x: 100, y: 65, rotate: 10 })
+        gsap.set(connectors, { strokeDasharray: 100, strokeDashoffset: 100 })
+        const sequence = gsap.timeline({
+          defaults: { ease: 'power2.inOut' },
+          scrollTrigger: {
+            trigger: root.current,
+            start: 'top top',
+            end: '+=360%',
+            pin: true,
+            scrub: 1,
+            invalidateOnRefresh: true,
+            onUpdate: (self) => setStage(Math.min(3, Math.floor(self.progress * 4))),
+          },
         })
-        return () => st.kill()
+        sequence
+          .to(cards[1], { opacity: 1, scale: 1, x: 0, y: 0, rotate: 4, duration: 0.8 }, 0.1)
+          .to(connectors[0], { strokeDashoffset: 0, duration: 0.65 }, 0.25)
+          .to(cards[2], { opacity: 1, scale: 1, x: 0, y: 0, rotate: 4, duration: 0.8 }, 0.95)
+          .to(connectors[1], { strokeDashoffset: 0, duration: 0.65 }, 1.08)
+          .to(cards[3], { opacity: 1, scale: 1, x: 0, y: 0, rotate: -4, duration: 0.8 }, 1.8)
+          .to(connectors[2], { strokeDashoffset: 0, duration: 0.65 }, 1.95)
+          .to(
+            cards,
+            { y: (index) => (index % 2 === 0 ? -10 : 10), duration: 0.7, stagger: 0.04 },
+            2.7,
+          )
+        const refresh = () => ScrollTrigger.refresh()
+        window.addEventListener('resize', refresh)
+        return () => {
+          window.removeEventListener('resize', refresh)
+          sequence.kill()
+        }
       })
     }, root)
     return () => ctx.revert()
@@ -329,24 +360,45 @@ function WorkflowScene() {
           ))}
         </div>
       </div>
-      <div className="vp-workflow-art">
+      <div className="vp-workflow-art" ref={art} data-stage={stage}>
         <div className="vp-art-grid" />
-        <div className="vp-art-card card-a">
+        <svg className="vp-workflow-lines" viewBox="0 0 700 520" aria-hidden>
+          <path
+            className="vp-workflow-connector"
+            pathLength="100"
+            d="M178 116 C275 96 360 132 452 160"
+          />
+          <path
+            className="vp-workflow-connector"
+            pathLength="100"
+            d="M490 210 C428 272 322 300 235 355"
+          />
+          <path
+            className="vp-workflow-connector"
+            pathLength="100"
+            d="M270 390 C365 370 432 382 528 414"
+          />
+        </svg>
+        <div className="vp-art-card card-a" data-role="source">
+          <WorkflowIcon kind="source" />
           <span>GITHUB / SOURCE</span>
           <strong>northstar/atlas-platform</strong>
           <small>4 pull requests · 6 commits</small>
         </div>
-        <div className="vp-art-card card-b">
+        <div className="vp-art-card card-b" data-role="classification">
+          <WorkflowIcon kind="classification" />
           <span>CLASSIFICATION</span>
           <strong>{stageData.label}</strong>
           <small>{stageData.title}</small>
         </div>
-        <div className="vp-art-card card-c">
+        <div className="vp-art-card card-c" data-role="approval">
+          <WorkflowIcon kind="approval" />
           <span>APPROVAL RECORD</span>
           <strong>03h 30m · APPROVED</strong>
           <small>Reviewer: Jordan Lee</small>
         </div>
-        <div className="vp-art-card card-d">
+        <div className="vp-art-card card-d" data-role="milestone">
+          <WorkflowIcon kind="milestone" />
           <span>MILESTONE</span>
           <strong>$1,800 USD · ACCEPTED</strong>
           <small>Explicit fixed-price value</small>
@@ -363,6 +415,22 @@ function WorkflowScene() {
         </div>
       </div>
     </section>
+  )
+}
+
+function WorkflowIcon({ kind }: { kind: 'source' | 'classification' | 'approval' | 'milestone' }) {
+  const path = {
+    source: 'M4 7h16M4 12h10M4 17h16M18 10l3 2-3 2',
+    classification: 'M12 4v16M4 12h16M7 7h10v10H7z',
+    approval: 'M5 12l4 4L19 6',
+    milestone: 'M12 3v18M5 8h14M5 16h14',
+  }[kind]
+  return (
+    <span className="vp-card-icon" aria-hidden>
+      <svg viewBox="0 0 24 24">
+        <path d={path} />
+      </svg>
+    </span>
   )
 }
 
@@ -477,15 +545,81 @@ function SolutionScene() {
   )
 }
 
-function UseCases() {
-  const cases = [
-    'Independent developers',
-    'Technical freelancers',
-    'Small software agencies',
-    'Engineering service firms',
-    'Consultants',
-    'Small client-billing teams',
+function AudienceIcon({ index }: { index: number }) {
+  const paths = [
+    'M4 7h16M4 12h10M4 17h16M18 10l3 2-3 2',
+    'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM4 21c.8-3.2 3.5-5 8-5s7.2 1.8 8 5',
+    'M4 8h16v10H4zM8 8V5h8v3M8 13h8M8 16h5',
+    'M4 20V9l8-5 8 5v11M8 20v-6h8v6M12 4v4',
+    'M5 5h14v14H5zM8 9h8M8 13h5M8 17h3',
+    'M4 9h8v8H4zM12 12h5l3 3v2h-8M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
   ]
+  return (
+    <svg className="vp-audience-icon" viewBox="0 0 24 24" aria-hidden>
+      <path d={paths[index]} />
+    </svg>
+  )
+}
+
+function UseCases() {
+  const root = useRef<HTMLElement>(null)
+  const track = useRef<HTMLDivElement>(null)
+  const [active, setActive] = useState(0)
+  const cases = [
+    ['Independent developers', 'Turn a repository trail into a client-readable record.'],
+    ['Technical freelancers', 'Keep human time and technical evidence separate but connected.'],
+    ['Small software agencies', 'Give every engagement a reviewable evidence chain.'],
+    ['Engineering service firms', 'Keep scope, delivery, and approval in the same workflow.'],
+    ['Consultants', 'Make fixed milestones easier to trace back to delivery context.'],
+    ['Small client-billing teams', 'Move from disconnected records to controlled reconciliation.'],
+  ]
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      const mm = gsap.matchMedia()
+      mm.add('(prefers-reduced-motion: no-preference) and (min-width: 901px)', () => {
+        const getTravel = () => {
+          if (!root.current || !track.current) return 0
+          const styles = getComputedStyle(root.current)
+          const available =
+            root.current.clientWidth -
+            parseFloat(styles.paddingLeft) -
+            parseFloat(styles.paddingRight)
+          return Math.max(0, track.current.scrollWidth - available)
+        }
+        const trigger = ScrollTrigger.create({
+          trigger: root.current,
+          start: 'top top',
+          end: () => `+=${Math.max(1, getTravel())}`,
+          pin: true,
+          scrub: 1,
+          invalidateOnRefresh: true,
+          animation: gsap.to(track.current, {
+            x: () => -getTravel(),
+            ease: 'none',
+            paused: true,
+            invalidateOnRefresh: true,
+          }),
+          onUpdate: (self) =>
+            setActive(Math.min(cases.length - 1, Math.round(self.progress * (cases.length - 1)))),
+        })
+        const refresh = () => ScrollTrigger.refresh()
+        window.addEventListener('resize', refresh)
+        document.fonts?.ready.then(refresh)
+        return () => {
+          window.removeEventListener('resize', refresh)
+          trigger.kill()
+        }
+      })
+      const onNativeScroll = () => {
+        if (!track.current || window.innerWidth > 900) return
+        const max = track.current.scrollWidth - track.current.clientWidth
+        setActive(max > 0 ? Math.round((track.current.scrollLeft / max) * (cases.length - 1)) : 0)
+      }
+      track.current?.addEventListener('scroll', onNativeScroll, { passive: true })
+      return () => track.current?.removeEventListener('scroll', onNativeScroll)
+    }, root)
+    return () => ctx.revert()
+  }, [cases.length])
   return (
     <section className="vp-usecases" id="audience">
       <div className="vp-section-intro">
@@ -496,17 +630,27 @@ function UseCases() {
           <em>ship for clients.</em>
         </h2>
       </div>
-      <div className="vp-case-track">
-        {cases.map((item, index) => (
-          <article key={item}>
-            <span>0{index + 1}</span>
-            <h3>{item}</h3>
-            <p>
-              Clearer project-to-work evidence, fewer disconnected records, and human-controlled
-              financial decisions.
-            </p>
-          </article>
-        ))}
+      <div className="vp-case-viewport">
+        <div className="vp-case-track" ref={track}>
+          {cases.map(([title, description], index) => (
+            <article className={active === index ? 'active' : ''} key={title} tabIndex={0}>
+              <span>0{index + 1}</span>
+              <AudienceIcon index={index} />
+              <h3>{title}</h3>
+              <p>{description}</p>
+              <b aria-hidden>↗</b>
+            </article>
+          ))}
+        </div>
+      </div>
+      <div
+        className="vp-case-progress"
+        aria-label={`Audience card ${active + 1} of ${cases.length}`}
+      >
+        <span style={{ transform: `scaleX(${(active + 1) / cases.length})` }} />
+        <small>
+          0{active + 1} / 0{cases.length}
+        </small>
       </div>
     </section>
   )
