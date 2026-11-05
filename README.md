@@ -6,21 +6,13 @@ VendorProof is a work-to-invoice reconciliation platform for technical freelance
 
 ## Current status
 
-The Phase 2 backend and frontend product-experience branch are ready for review. The current implementation includes:
+Repository: [hitakshijoshi20072911/scppi](https://github.com/hitakshijoshi20072911/scppi). Phase 1–3 code is merged to `main` (latest audited commit: `95a7ef1` on 2026-11-05). Current source includes PostgreSQL-backed authentication and workspace records; client, project, contract, time-entry, milestone, GitHub evidence/reconciliation, and invoice-preview/review flows; and the public fictional demo. See the phase documents for precise scope.
 
-- A Fastify API foundation with request IDs, safe errors, exact-origin CORS, security headers, and health endpoints.
-- A Next.js frontend with a Lenis-powered, reduced-motion-safe product landing page, login, registration, protected workspace shell, workspace selection, live dashboard counts, and API-backed client/project creation.
-- An unauthenticated `/demo` experience using deterministic fictional Northstar Studio / Atlas Platform fixtures. It never calls GitHub, Swytchcode, Stripe, authentication, or production write endpoints.
-- PostgreSQL/Drizzle migration scaffolding with a Phase 0 connectivity sentinel only.
-- A root npm workspace with one authoritative `package-lock.json`.
-- Vitest backend unit tests, a Playwright browser smoke test, ESLint, Prettier, TypeScript checks, and GitHub Actions CI.
-- A Render Blueprint for the API web service, now tracking `main`. Supabase remains the database host; the Blueprint does not create a database or background worker.
-- Preserved Lenis source under `server/src/lenis`; the browser provider is integrated under `apps/web/components/lenis-provider.tsx`, with cleanup, anchors, touch sync, and reduced-motion handling.
-- PostgreSQL-backed authentication, revocable sessions, users, workspaces, memberships, role permissions, clients, projects, contracts, human-entered time entries, fixed-price milestones, and append-only audit events.
-- GitHub repository mapping, contract-scoped deterministic classification, versioned evidence-reconciliation runs, failed-source retry, explicit partial-data acceptance, and owner/admin human review.
-- Forced workspace RLS for the additive Phase 2 tables and a payload-minimizing, mocked-tested GitHub read adapter behind an injectable Swytchcode executor.
+Verification at the latest Stage 5 read-only audit (2026-11-05): format, lint, server/web typecheck, 49 backend unit tests, 6 Playwright tests, server/web production builds, static migration metadata check, and production dependency audit passed. These local checks do **not** establish that a hosted database is migrated, RLS works under the restricted runtime role, or authenticated CRUD works against staging.
 
-The public Vercel frontend (`https://vendorproof-web-two.vercel.app/`) and Render API (`https://vendorproof-api.onrender.com/`) returned successful smoke-test responses on 2026-11-05, including API database readiness. These checks do not prove production readiness: the observed Render CORS value still pointed at a Vercel preview hostname, and the Render dashboard secret values and tenant-specific GitHub OAuth connection require owner-controlled verification. The default Swytchcode executor remains fail-closed when its server-only token or provider connection is unavailable. Invoice workflows and durable worker jobs remain deferred.
+Deployment and provider state must be treated as unverified until checked in the owners' dashboards and against isolated staging. A public GET of the documented Vercel URL returned HTTP 200 during this audit; the documented Render `/health/live` and `/health/ready` requests timed out. No staging migration, restricted-role RLS test, hosted authenticated CRUD, live GitHub OAuth execution, Stripe draft operation, or Google Calendar call was performed. Stripe external writes and PDF export are not implemented; Google Calendar support is not verified. Never use a production database as staging or describe mocks/static checks as provider verification.
+
+The repository contains additive migrations through `0004_phase3_invoice_approval.sql`. The README's previous statement that the schema remained a Phase 0 sentinel is stale. Whether the hosted database has applied these migrations is unknown here. A controlled isolated staging database and rotated credentials are required before remote validation or migrations.
 
 ## Architecture
 
