@@ -48,8 +48,26 @@ Set these service variables in Render:
 - `API_CORS_ORIGIN=https://<the-exact-vercel-production-origin>`
 - `DATABASE_URL=<Supabase PostgreSQL connection string>` as a secret
 - `LOG_LEVEL=info`
+- `SWYTCHCODE_TOKEN=<rotated Swytchcode service token>` as a secret
 
 Render supplies `PORT` for the web service. Do not hardcode secrets in `render.yaml`; its `sync: false` entries are prompts for dashboard values. Use one exact browser origin for CORS; do not use `*` with credentials. See [Render Blueprints](https://render.com/docs/blueprint-spec), [environment variables and secrets](https://render.com/docs/configure-environment-variables), and [health checks](https://render.com/docs/health-checks).
+
+### Swytchcode runtime and GitHub connection
+The API uses the pinned `@swytchcode/runtime` and `swytchcode` packages. The production executor remains fail-closed when `SWYTCHCODE_TOKEN` is absent. It accepts only the verified GitHub read methods, derives `tenantId` from the authenticated workspace on the server, passes bounded provider parameters through the Runtime SDK, and applies the SDK's 90-second subprocess timeout. It never calls GitHub directly or falls back to the application's own account.
+
+Complete the one-time GitHub provider connection from a laptop with a browser, not from a headless Render shell:
+
+```bash
+git clone https://github.com/hitakshijoshi20072911/scppi.git
+cd scppi
+npm ci
+export SWYTCHCODE_TOKEN='your-rotated-service-token'
+npx swytchcode auth connect github
+# Select the downloaded <github> library when prompted, then approve GitHub OAuth.
+npx swytchcode auth status
+```
+
+Do not paste the service token, GitHub password, or OAuth code into chat. The provider consent must finish successfully before claiming live GitHub evidence ingestion. Afterward, set the same rotated service token as the Render `SWYTCHCODE_TOKEN` secret and redeploy. If the CLI reports `setup_required`, the Swytchcode workspace owner must first complete `swy auth connect github`; if it reports `tenant_not_connected`, the signed-in VendorProof workspace still needs its workspace-level connection flow.
 
 The Blueprint currently follows `feat/foundation-0` so it can be previewed from this branch. Before production, merge a reviewed release to `main` and update the Blueprint service branch to `main`. Confirm the service's selected region, plan, auto-deploy policy, and environment before its first production deploy.
 

@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto'
+import { exec as swytchcodeExec } from '@swytchcode/runtime'
 import {
   githubCommitGet2InputSchema,
   githubPullCommitsGetInputSchema,
   githubPullGet1InputSchema,
   githubPullGetInputSchema,
 } from '../providers/github/schemas.js'
+import { config } from '../platform/config.js'
 
 export const VERIFIED_GITHUB_READ_METHOD_IDS = [
   'github.pull.get',
@@ -32,6 +34,23 @@ export interface ValidatedSwytchcodeExecutionRequest extends SwytchcodeExecution
 
 export interface SwytchcodeTransport {
   execute(request: ValidatedSwytchcodeExecutionRequest): Promise<unknown>
+}
+
+const runtimeTimeoutMs = 90_000
+
+/** Production transport for the official Swytchcode runtime. */
+export function createSwytchcodeRuntimeTransport(): SwytchcodeTransport | undefined {
+  if (!config.SWYTCHCODE_TOKEN) return undefined
+
+  return {
+    async execute(request) {
+      return swytchcodeExec(
+        request.methodId,
+        { params: request.input as Record<string, string> },
+        { tenantId: request.identity.workspaceId, timeoutMs: runtimeTimeoutMs },
+      )
+    },
+  }
 }
 
 export interface SwytchcodeExecutor {
@@ -239,3 +258,8 @@ export function createSwytchcodeExecutor(transport?: SwytchcodeTransport): Swytc
 
 /** Fail-closed default until a reviewed, verified Swytchcode runtime is injected. */
 export const unavailableExecutor: SwytchcodeExecutor = createSwytchcodeExecutor()
+
+/** Uses the production runtime when configured, otherwise fails closed. */
+export const productionExecutor: SwytchcodeExecutor = createSwytchcodeExecutor(
+  createSwytchcodeRuntimeTransport(),
+)
