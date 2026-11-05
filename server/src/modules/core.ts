@@ -62,15 +62,17 @@ export function setSessionCookie(
   reply: { header: (name: string, value: string) => unknown },
   token: string,
 ) {
+  const crossOrigin = config.NODE_ENV === 'production'
   reply.header(
     'set-cookie',
-    `__Host-vendorproof_session=${token}; Path=/; HttpOnly; SameSite=Lax${config.NODE_ENV === 'production' ? '; Secure' : ''}`,
+    `__Host-vendorproof_session=${token}; Path=/; HttpOnly; SameSite=${crossOrigin ? 'None' : 'Lax'}${crossOrigin ? '; Secure' : ''}`,
   )
 }
 export function clearSessionCookie(reply: { header: (name: string, value: string) => unknown }) {
+  const crossOrigin = config.NODE_ENV === 'production'
   reply.header(
     'set-cookie',
-    '__Host-vendorproof_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax',
+    `__Host-vendorproof_session=; Path=/; HttpOnly; Max-Age=0; SameSite=${crossOrigin ? 'None' : 'Lax'}${crossOrigin ? '; Secure' : ''}`,
   )
 }
 export async function createSession(userId: string) {

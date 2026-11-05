@@ -65,6 +65,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void refresh()
   }, [])
 
+  useEffect(() => {
+    const onExpired = () => {
+      setUser(null)
+      setWorkspaces([])
+      setActiveWorkspaceIdState(null)
+      setError('Your session expired. Sign in again to continue.')
+    }
+    window.addEventListener('vendorproof:session-expired', onExpired)
+    return () => window.removeEventListener('vendorproof:session-expired', onExpired)
+  }, [])
+
   const setActiveWorkspaceId = (id: string) => {
     if (!workspaces.some((workspace) => workspace.id === id)) return
     window.localStorage.setItem(workspaceKey, id)
