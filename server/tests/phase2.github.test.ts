@@ -9,8 +9,51 @@ import {
 } from '../src/swytchcode/executor.js'
 import { GithubAdapter, GithubAdapterError } from '../src/providers/github/adapter.js'
 import type { ValidatedSwytchcodeExecutionRequest } from '../src/swytchcode/executor.js'
+import { createSwytchcodeTenantManager } from '../src/swytchcode/tenants.js'
 
 const identity = { workspaceId: 'workspace-authenticated-1' }
+
+describe('Swytchcode provider tenant lifecycle', () => {
+  it('passes the explicit workspace ID to the official runtime and validates its OAuth URL', () => {
+    const runtime = {
+      connect: vi.fn(() => ({
+        url: 'https://connect.swytchcode.com/oauth',
+        connectedAccountUuid: 'opaque-id',
+      })),
+      disconnect: vi.fn(),
+    }
+    const manager = createSwytchcodeTenantManager(runtime)
+
+    expect(manager.connect('github', identity.workspaceId)).toEqual({
+      url: 'https://connect.swytchcode.com/oauth',
+      connectedAccountUuid: 'opaque-id',
+    })
+    manager.disconnect('github', identity.workspaceId)
+
+    expect(runtime.connect).toHaveBeenCalledWith({
+      provider: 'github',
+      tenantId: identity.workspaceId,
+    })
+    expect(runtime.disconnect).toHaveBeenCalledWith({
+      provider: 'github',
+      tenantId: identity.workspaceId,
+    })
+  })
+
+  it('rejects missing tenant identity and unsafe runtime connection URLs', () => {
+    const runtime = {
+      connect: vi.fn(() => ({ url: 'http://attacker.invalid/oauth', connectedAccountUuid: 'x' })),
+      disconnect: vi.fn(),
+    }
+    const manager = createSwytchcodeTenantManager(runtime)
+
+    expect(() => manager.connect('github', '')).toThrow('workspace is required')
+    expect(() => manager.connect('github', identity.workspaceId)).toThrow('invalid connection URL')
+    expect(runtime.connect).toHaveBeenCalledTimes(1)
+    expect(() => manager.disconnect('github', '')).toThrow('workspace is required')
+    expect(runtime.disconnect).not.toHaveBeenCalled()
+  })
+})
 
 function validInput(methodId: (typeof VERIFIED_GITHUB_READ_METHOD_IDS)[number]) {
   switch (methodId) {

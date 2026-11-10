@@ -139,16 +139,46 @@ export default function RecordsPage() {
                   <div className="record-actions">
                     <span className="record-status">{String(entry.status ?? 'draft')}</span>
                     {entry.status === 'draft' && (
-                      <button
-                        className="text-button"
-                        onClick={() =>
-                          act(() =>
-                            workspaceApi(activeWorkspace!.id).submitTimeEntry(String(entry.id)),
-                          )
-                        }
-                      >
-                        Submit
-                      </button>
+                      <>
+                        <button
+                          className="text-button"
+                          onClick={() =>
+                            act(() =>
+                              workspaceApi(activeWorkspace!.id).submitTimeEntry(String(entry.id)),
+                            )
+                          }
+                        >
+                          Submit
+                        </button>
+                        <button
+                          className="text-button"
+                          onClick={async () => {
+                            const description = window.prompt(
+                              'Work description',
+                              String(entry.description ?? ''),
+                            )
+                            if (description === null || !description.trim()) return
+                            await act(() =>
+                              workspaceApi(activeWorkspace!.id).updateTimeEntry(String(entry.id), {
+                                description,
+                              }),
+                            )
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="text-button"
+                          onClick={async () => {
+                            if (!window.confirm('Delete this draft time entry?')) return
+                            await act(() =>
+                              workspaceApi(activeWorkspace!.id).deleteTimeEntry(String(entry.id)),
+                            )
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </>
                     )}
                     {entry.status === 'submitted' && (
                       <button
@@ -184,18 +214,51 @@ export default function RecordsPage() {
                   <div className="record-actions">
                     <span className="record-status">{String(milestone.status ?? 'draft')}</span>
                     {milestone.status === 'draft' && (
-                      <button
-                        className="text-button"
-                        onClick={() =>
-                          act(() =>
-                            workspaceApi(activeWorkspace!.id).completeMilestone(
-                              String(milestone.id),
-                            ),
-                          )
-                        }
-                      >
-                        Complete
-                      </button>
+                      <>
+                        <button
+                          className="text-button"
+                          onClick={() =>
+                            act(() =>
+                              workspaceApi(activeWorkspace!.id).completeMilestone(
+                                String(milestone.id),
+                              ),
+                            )
+                          }
+                        >
+                          Complete
+                        </button>
+                        <button
+                          className="text-button"
+                          onClick={async () => {
+                            const title = window.prompt(
+                              'Milestone title',
+                              String(milestone.title ?? ''),
+                            )
+                            if (title === null || !title.trim()) return
+                            await act(() =>
+                              workspaceApi(activeWorkspace!.id).updateMilestone(
+                                String(milestone.id),
+                                { title },
+                              ),
+                            )
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="text-button"
+                          onClick={async () => {
+                            if (!window.confirm('Archive this milestone?')) return
+                            await act(() =>
+                              workspaceApi(activeWorkspace!.id).deleteMilestone(
+                                String(milestone.id),
+                              ),
+                            )
+                          }}
+                        >
+                          Archive
+                        </button>
+                      </>
                     )}
                     {milestone.status === 'completed' && (
                       <button

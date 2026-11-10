@@ -4,7 +4,7 @@ import type { TransactionSql } from 'postgres'
 import { z } from 'zod'
 import { getDatabase } from '../../db/client.js'
 import { config } from '../../platform/config.js'
-import { authenticate, requireContext } from '../../modules/core.js'
+import { authenticate, requireContext, setDbContext } from '../../modules/core.js'
 import {
   buildInvoicePreview,
   canonicalJson,
@@ -44,11 +44,13 @@ function requestHash(request: FastifyRequest): string {
   return createHash('sha256').update(request.id).digest('hex').slice(0, 48)
 }
 async function withWorkspace<T>(
+  request: FastifyRequest,
   workspaceId: string,
   action: (tx: TransactionSql) => Promise<T>,
 ): Promise<T> {
+  const { auth } = await requireContext(request, workspaceId, 'read')
   const result = await getDatabase().begin(async (tx) => {
-    await tx`select set_config('app.workspace_id', ${workspaceId}, true)`
+    await setDbContext(tx, { userId: auth.userId, sessionId: auth.sessionId, workspaceId })
     return action(tx)
   })
   return result as unknown as T
@@ -215,7 +217,7 @@ export async function phase3Routes(app: FastifyInstance) {
   app.addHook('onRequest', async (request) => {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return
     const origin = request.headers.origin
-    if (origin && origin !== config.API_CORS_ORIGIN)
+    if (origin && origin !== config.API_CORS_ORIGIN && !config.API_CORS_ORIGINS.includes(origin))
       fail(403, 'FORBIDDEN_ORIGIN', 'Origin is not allowed')
     const auth = await authenticate(request)
     if (auth && request.headers['x-csrf-token'] !== auth.csrfToken)
@@ -226,6 +228,7 @@ export async function phase3Routes(app: FastifyInstance) {
     const params = z.object({ workspaceId: uuid }).strict().parse(request.params)
     await requireContext(request, params.workspaceId, 'read')
     const runs = await withWorkspace(
+      request,
       params.workspaceId,
       async (tx) => tx`
       select br.id, br.project_id, br.contract_id, br.period_start, br.period_end, br.version,
@@ -250,7 +253,7 @@ export async function phase3Routes(app: FastifyInstance) {
       const { auth } = await requireContext(request, workspaceId, 'write')
       const body = parse(createSchema, request.body)
       try {
-        const result = await withWorkspace(workspaceId, async (tx) => {
+        const result = await withWorkspace(request, workspaceId, async (tx) => {
           const [run] =
             await tx`select id, version from billing_run where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${runId} for update`
           if (!run) fail(404, 'NOT_FOUND', 'Reconciliation run not found')
@@ -308,6 +311,7 @@ export async function phase3Routes(app: FastifyInstance) {
     const params = z.object({ workspaceId: uuid }).strict().parse(request.params)
     await requireContext(request, params.workspaceId, 'read')
     const invoices = await withWorkspace(
+      request,
       params.workspaceId,
       async (tx) => tx`
       select ip.id, ip.project_id, ip.contract_id, ip.billing_run_id, ip.period_start, ip.period_end,
@@ -325,7 +329,7 @@ export async function phase3Routes(app: FastifyInstance) {
   app.get('/api/v1/workspaces/:workspaceId/invoice-previews/:invoiceId', async (request, reply) => {
     const { workspaceId, invoiceId } = parse(invoiceParams, request.params)
     await requireContext(request, workspaceId, 'read')
-    const result = await withWorkspace(workspaceId, async (tx) => {
+    const result = await withWorkspace(request, workspaceId, async (tx) => {
       const [invoice] =
         await tx`select id, project_id, contract_id, billing_run_id, period_start, period_end, currency, subtotal_minor, content_hash, status, version, snapshot, approved_by, approved_at, rejection_reason, created_at from invoice_preview where workspace_id = ${workspaceId} and id = ${invoiceId}`
       if (!invoice) fail(404, 'NOT_FOUND', 'Invoice preview not found')
@@ -348,7 +352,7 @@ export async function phase3Routes(app: FastifyInstance) {
       if (Date.now() - auth.authenticatedAt.getTime() > 15 * 60_000)
         fail(403, 'RECENT_AUTH_REQUIRED', 'Sign in again before reviewing this invoice')
       const body = parse(reviewSchema, request.body)
-      const result = await withWorkspace(workspaceId, async (tx) => {
+      const result = await withWorkspace(request, workspaceId, async (tx) => {
         const [invoice] =
           await tx`select id, project_id, billing_run_id, content_hash, snapshot, status, version from invoice_preview where workspace_id = ${workspaceId} and id = ${invoiceId} for update`
         if (!invoice) fail(404, 'NOT_FOUND', 'Invoice preview not found')

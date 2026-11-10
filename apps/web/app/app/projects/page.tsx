@@ -80,7 +80,55 @@ export default function ProjectsPage() {
                   <strong>{String(project.name ?? 'Unnamed project')}</strong>
                   <small>{String(project.description ?? 'No description')}</small>
                 </div>
-                <span className="record-status">{String(project.status ?? 'active')}</span>
+                <div className="record-actions">
+                  <span className="record-status">{String(project.status ?? 'active')}</span>
+                  {project.status !== 'archived' && (
+                    <>
+                      <button
+                        className="text-button"
+                        onClick={async () => {
+                          const name = window.prompt('Project name', String(project.name ?? ''))
+                          if (name === null || !name.trim() || !activeWorkspace) return
+                          try {
+                            await workspaceApi(activeWorkspace.id).updateProject(
+                              String(project.id),
+                              { name },
+                            )
+                            load()
+                          } catch (cause) {
+                            setError(
+                              cause instanceof Error
+                                ? cause.message
+                                : 'Project could not be updated.',
+                            )
+                          }
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="text-button"
+                        onClick={async () => {
+                          if (!window.confirm('Archive this project?')) return
+                          try {
+                            await workspaceApi(activeWorkspace!.id).deleteProject(
+                              String(project.id),
+                            )
+                            load()
+                          } catch (cause) {
+                            setError(
+                              cause instanceof Error
+                                ? cause.message
+                                : 'Project could not be archived.',
+                            )
+                          }
+                        }}
+                      >
+                        Archive
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>

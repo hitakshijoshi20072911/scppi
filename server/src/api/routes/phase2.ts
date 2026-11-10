@@ -2,13 +2,10 @@ import { createHash } from 'node:crypto'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { TransactionSql } from 'postgres'
 import { z } from 'zod'
-import {
-  connect as swytchcodeConnect,
-  disconnect as swytchcodeDisconnect,
-} from '@swytchcode/runtime'
 import { getDatabase } from '../../db/client.js'
 import { createAuditedSwytchcodeExecutor } from '../../db/repositories/provider-execution.js'
 import { config } from '../../platform/config.js'
+import { swytchcodeTenantManager } from '../../swytchcode/tenants.js'
 import {
   classifyWorkItem,
   type ScopeKeywordRule,
@@ -18,7 +15,7 @@ import {
   transitionReconciliation,
   type ReconciliationState,
 } from '../../modules/reconciliation/state-machine.js'
-import { authenticate, requireContext } from '../../modules/core.js'
+import { authenticate, requireContext, setDbContext } from '../../modules/core.js'
 import { GithubAdapter } from '../../providers/github/adapter.js'
 import { unavailableExecutor, type SwytchcodeExecutor } from '../../swytchcode/executor.js'
 const uuid = z.string().uuid()
@@ -107,11 +104,13 @@ function ok(reply: FastifyReply, data: unknown, status = 200) {
 }
 
 async function withWorkspace<T>(
+  request: FastifyRequest,
   workspaceId: string,
   action: (tx: TransactionSql) => Promise<T>,
 ): Promise<T> {
+  const { auth } = await requireContext(request, workspaceId, 'read')
   const result = await getDatabase().begin(async (tx) => {
-    await tx`select set_config('app.workspace_id', ${workspaceId}, true)`
+    await setDbContext(tx, { userId: auth.userId, sessionId: auth.sessionId, workspaceId })
     return action(tx)
   })
   // postgres-js unwraps query arrays from transaction callbacks; the service callback owns T.
@@ -206,7 +205,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
   app.addHook('onRequest', async (request) => {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return
     const origin = request.headers.origin
-    if (origin && origin !== config.API_CORS_ORIGIN)
+    if (origin && origin !== config.API_CORS_ORIGIN && !config.API_CORS_ORIGINS.includes(origin))
       fail(403, 'FORBIDDEN_ORIGIN', 'Origin is not allowed')
     const auth = await authenticate(request)
     if (auth && request.headers['x-csrf-token'] !== auth.csrfToken)
@@ -216,6 +215,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
     const { workspaceId, projectId } = parse(paramsSchema, request.params)
     await requireContext(request, workspaceId, 'read')
     const sources = await withWorkspace(
+      request,
       workspaceId,
       async (tx) =>
         tx`select id, provider, repository_owner, repository_name, repository_url, connection_status, created_at, updated_at from source_connection where workspace_id = ${workspaceId} and project_id = ${projectId} order by created_at`,
@@ -230,7 +230,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
       const { auth } = await requireContext(request, workspaceId, 'write')
       const body = parse(repositorySchema, request.body)
       try {
-        const result = await withWorkspace(workspaceId, async (tx) => {
+        const result = await withWorkspace(request, workspaceId, async (tx) => {
           const [project] =
             await tx`select id from project where workspace_id = ${workspaceId} and id = ${projectId} and status = 'active'`
           if (!project) fail(404, 'NOT_FOUND', 'Project not found')
@@ -256,7 +256,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
       const { auth } = await requireContext(request, workspaceId, 'write')
       if (!config.SWYTCHCODE_TOKEN)
         fail(503, 'SWYTCHCODE_NOT_CONFIGURED', 'Swytchcode is not configured on this server')
-      const source = await withWorkspace(workspaceId, async (tx) => {
+      const source = await withWorkspace(request, workspaceId, async (tx) => {
         const [row] =
           await tx`select id, provider, repository_owner, repository_name, connection_status from source_connection where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${sourceId}`
         if (!row) fail(404, 'NOT_FOUND', 'Repository source not found')
@@ -265,8 +265,9 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
         return row
       })
       try {
-        const result = swytchcodeConnect({ provider: source.provider, tenantId: workspaceId })
+        const result = swytchcodeTenantManager.connect(source.provider, workspaceId)
         await withWorkspace(
+          request,
           workspaceId,
           async (tx) =>
             tx`insert into audit_event (workspace_id, actor_user_id, action, entity_type, entity_id, after_data, request_id) values (${workspaceId}, ${auth.userId}, 'source.connection_initiated', 'source_connection', ${source.id}, ${JSON.stringify({ provider: source.provider, repository: `${source.repository_owner}/${source.repository_name}` })}, ${safeCorrelationId(request)})`,
@@ -283,7 +284,9 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
     async (request, reply) => {
       const { workspaceId, projectId, sourceId } = parse(sourceParamsSchema, request.params)
       const { auth } = await requireContext(request, workspaceId, 'write')
-      const source = await withWorkspace(workspaceId, async (tx) => {
+      if (!config.SWYTCHCODE_TOKEN)
+        fail(503, 'SWYTCHCODE_NOT_CONFIGURED', 'Swytchcode is not configured on this server')
+      const source = await withWorkspace(request, workspaceId, async (tx) => {
         const [row] =
           await tx`select id, provider, repository_owner, repository_name, connection_status from source_connection where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${sourceId}`
         if (!row) fail(404, 'NOT_FOUND', 'Repository source not found')
@@ -305,7 +308,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
           'GitHub consent or repository access is not verified',
         )
       }
-      const updated = await withWorkspace(workspaceId, async (tx) => {
+      const updated = await withWorkspace(request, workspaceId, async (tx) => {
         const [row] =
           await tx`update source_connection set connection_status = 'connected', connected_at = coalesce(connected_at, now()), updated_at = now() where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${sourceId} returning id, provider, repository_owner, repository_name, repository_url, connection_status, connected_at, updated_at`
         await tx`insert into audit_event (workspace_id, actor_user_id, action, entity_type, entity_id, after_data, request_id) values (${workspaceId}, ${auth.userId}, 'source.connection_verified', 'source_connection', ${sourceId}, ${JSON.stringify({ provider: 'github', verification: 'read_repository' })}, ${safeCorrelationId(request)})`
@@ -320,20 +323,20 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
     async (request, reply) => {
       const { workspaceId, projectId, sourceId } = parse(sourceParamsSchema, request.params)
       const { auth } = await requireContext(request, workspaceId, 'write')
-      const source = await withWorkspace(workspaceId, async (tx) => {
+      const source = await withWorkspace(request, workspaceId, async (tx) => {
         const [row] =
           await tx`select id, provider, connection_status from source_connection where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${sourceId}`
         if (!row) fail(404, 'NOT_FOUND', 'Repository source not found')
         return row
       })
-      if (config.SWYTCHCODE_TOKEN) {
-        try {
-          swytchcodeDisconnect({ provider: source.provider, tenantId: workspaceId })
-        } catch {
-          fail(503, 'SWYTCHCODE_DISCONNECT_FAILED', 'GitHub connection could not be revoked')
-        }
+      if (!config.SWYTCHCODE_TOKEN)
+        fail(503, 'SWYTCHCODE_NOT_CONFIGURED', 'Swytchcode is not configured on this server')
+      try {
+        swytchcodeTenantManager.disconnect(source.provider, workspaceId)
+      } catch {
+        fail(503, 'SWYTCHCODE_DISCONNECT_FAILED', 'GitHub connection could not be revoked')
       }
-      const updated = await withWorkspace(workspaceId, async (tx) => {
+      const updated = await withWorkspace(request, workspaceId, async (tx) => {
         const [row] =
           await tx`update source_connection set connection_status = 'not_connected', connected_at = null, updated_at = now() where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${sourceId} returning id, provider, repository_owner, repository_name, repository_url, connection_status, connected_at, updated_at`
         await tx`insert into audit_event (workspace_id, actor_user_id, action, entity_type, entity_id, after_data, request_id) values (${workspaceId}, ${auth.userId}, 'source.connection_revoked', 'source_connection', ${sourceId}, ${JSON.stringify({ provider: source.provider })}, ${safeCorrelationId(request)})`
@@ -349,7 +352,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
       const { workspaceId, projectId, contractId } = parse(contractParamsSchema, request.params)
       const { auth } = await requireContext(request, workspaceId, 'write')
       const body = parse(scopeRulesSchema, request.body)
-      const result = await withWorkspace(workspaceId, async (tx) => {
+      const result = await withWorkspace(request, workspaceId, async (tx) => {
         const [project] =
           await tx`select id from project where workspace_id = ${workspaceId} and id = ${projectId} and status = 'active'`
         if (!project) fail(404, 'NOT_FOUND', 'Project not found')
@@ -405,7 +408,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
       86_400_000
     if (periodDays > 366)
       fail(422, 'INVALID_PERIOD', 'Reconciliation periods cannot exceed 366 days')
-    const result = await withWorkspace(workspaceId, async (tx) => {
+    const result = await withWorkspace(request, workspaceId, async (tx) => {
       const [project] =
         await tx`select id, time_zone from project where workspace_id = ${workspaceId} and id = ${projectId} and status = 'active'`
       if (!project) fail(404, 'NOT_FOUND', 'Project not found')
@@ -443,6 +446,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
       const { workspaceId, projectId, runId } = parse(runParamsSchema, request.params)
       await requireContext(request, workspaceId, 'read')
       const [run] = await withWorkspace(
+        request,
         workspaceId,
         async (tx) =>
           tx`select id, project_id, period_start, period_end, time_zone, status, completeness, version, outstanding_decisions, accepted_partial_at, created_at, updated_at from billing_run where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${runId}`,
@@ -470,7 +474,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
         state: ReconciliationState
       }
       try {
-        snapshot = await withWorkspace(workspaceId, async (tx) => {
+        snapshot = await withWorkspace(request, workspaceId, async (tx) => {
           const [run] =
             await tx`select id, project_id, period_start, period_end, time_zone, status, version, outstanding_decisions from billing_run where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${runId} for update`
           if (!run) fail(404, 'NOT_FOUND', 'Reconciliation run not found')
@@ -526,7 +530,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
       for (const source of snapshot.sources) {
         if (source.connection_status !== 'connected') {
           failedSources += 1
-          await withWorkspace(workspaceId, async (tx) => {
+          await withWorkspace(request, workspaceId, async (tx) => {
             await tx`update run_source set status = 'failed', error_code = 'PROVIDER_NOT_CONNECTED', completed_at = now() where workspace_id = ${workspaceId} and run_id = ${runId} and source_connection_id = ${source.id}`
           })
           continue
@@ -566,7 +570,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
             commitsComplete = commitsComplete && commitResult.complete
           }
           const importedItems = [...inPeriod, ...commits]
-          await withWorkspace(workspaceId, async (tx) => {
+          await withWorkspace(request, workspaceId, async (tx) => {
             for (const item of importedItems) {
               const hash = evidenceHash(item)
               const relatedExternalId =
@@ -583,7 +587,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
           else failedSources += 1
         } catch {
           failedSources += 1
-          await withWorkspace(workspaceId, async (tx) => {
+          await withWorkspace(request, workspaceId, async (tx) => {
             await tx`update run_source set status = 'failed', error_code = 'PROVIDER_READ_FAILED', completed_at = now() where workspace_id = ${workspaceId} and run_id = ${runId} and source_connection_id = ${source.id}`
           })
         }
@@ -602,7 +606,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
       } catch (error) {
         transitionError(error)
       }
-      const summary = await withWorkspace(workspaceId, async (tx) => {
+      const summary = await withWorkspace(request, workspaceId, async (tx) => {
         const [updated] =
           await tx`update billing_run set status = ${finalState.status}, completeness = ${failedSources === 0 ? 'complete' : 'partial'}, version = ${finalState.version}, updated_at = now() where workspace_id = ${workspaceId} and id = ${runId} and version = ${snapshot.state.version} returning id, status, completeness, version`
         if (!updated)
@@ -624,7 +628,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
       const { workspaceId, projectId, runId } = parse(runParamsSchema, request.params)
       const { auth } = await requireContext(request, workspaceId, 'write')
       const body = parse(versionSchema.extend({ sourceId: uuid }).strict(), request.body)
-      const snapshot = await withWorkspace(workspaceId, async (tx) => {
+      const snapshot = await withWorkspace(request, workspaceId, async (tx) => {
         const [run] =
           await tx`select id, project_id, period_start, period_end, time_zone, status, version, outstanding_decisions from billing_run where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${runId} for update`
         if (!run) fail(404, 'NOT_FOUND', 'Reconciliation run not found')
@@ -712,7 +716,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
             commitsComplete = commitsComplete && commitResult.complete
           }
           const importedItems = [...inPeriod, ...commits]
-          await withWorkspace(workspaceId, async (tx) => {
+          await withWorkspace(request, workspaceId, async (tx) => {
             for (const item of importedItems) {
               const hash = evidenceHash(item)
               const relatedExternalId =
@@ -731,7 +735,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
         }
       }
 
-      const result = await withWorkspace(workspaceId, async (tx) => {
+      const result = await withWorkspace(request, workspaceId, async (tx) => {
         await tx`update run_source set status = ${sourceReadComplete ? 'succeeded' : 'failed'}, error_code = ${errorCode}, completed_at = now() where workspace_id = ${workspaceId} and run_id = ${runId} and source_connection_id = ${body.sourceId}`
         const [remaining] =
           await tx`select count(*)::int as count from run_source where workspace_id = ${workspaceId} and run_id = ${runId} and status <> 'succeeded'`
@@ -763,7 +767,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
       const { workspaceId, projectId, runId } = parse(runParamsSchema, request.params)
       const { auth } = await requireContext(request, workspaceId, 'write')
       const body = parse(versionSchema, request.body)
-      const result = await withWorkspace(workspaceId, async (tx) => {
+      const result = await withWorkspace(request, workspaceId, async (tx) => {
         const [run] =
           await tx`select id, status, version, outstanding_decisions from billing_run where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${runId} for update`
         if (!run) fail(404, 'NOT_FOUND', 'Reconciliation run not found')
@@ -794,7 +798,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
       const { workspaceId, projectId, runId } = parse(runParamsSchema, request.params)
       const { auth } = await requireContext(request, workspaceId, 'read')
       const body = parse(versionSchema, request.body)
-      const result = await withWorkspace(workspaceId, async (tx) => {
+      const result = await withWorkspace(request, workspaceId, async (tx) => {
         const [run] =
           await tx`select id, project_id, period_start, period_end, time_zone, scope_rules_snapshot, status, version, outstanding_decisions from billing_run where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${runId} for update`
         if (!run) fail(404, 'NOT_FOUND', 'Reconciliation run not found')
@@ -858,6 +862,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
       const { workspaceId, projectId, runId } = parse(runParamsSchema, request.params)
       await requireContext(request, workspaceId, 'read')
       const items = await withWorkspace(
+        request,
         workspaceId,
         async (tx) =>
           tx`select ri.id, ri.work_item_id, ri.classification_status, ri.category, ri.reason, ri.client_description, ri.human_decision_at, w.item_type, w.title, w.state, w.author, w.source_url, w.provider_created_at from run_item ri join work_item w on w.workspace_id = ri.workspace_id and w.id = ri.work_item_id where ri.workspace_id = ${workspaceId} and ri.run_id = ${runId} and w.project_id = ${projectId} order by w.provider_created_at, w.id limit 10000`,
@@ -878,7 +883,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
           'HUMAN_DECISION_REQUIRED',
           'Approval requires a category and client-friendly description',
         )
-      const result = await withWorkspace(workspaceId, async (tx) => {
+      const result = await withWorkspace(request, workspaceId, async (tx) => {
         const [run] =
           await tx`select id, project_id, status, version, outstanding_decisions from billing_run where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${runId} for update`
         if (!run) fail(404, 'NOT_FOUND', 'Reconciliation run not found')
@@ -920,7 +925,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
       const { workspaceId, projectId, runId } = parse(runParamsSchema, request.params)
       const { auth } = await requireContext(request, workspaceId, 'write')
       const body = parse(versionSchema, request.body)
-      const result = await withWorkspace(workspaceId, async (tx) => {
+      const result = await withWorkspace(request, workspaceId, async (tx) => {
         const [run] =
           await tx`select id, project_id, status, version, outstanding_decisions from billing_run where workspace_id = ${workspaceId} and project_id = ${projectId} and id = ${runId} for update`
         if (!run) fail(404, 'NOT_FOUND', 'Reconciliation run not found')

@@ -38,4 +38,26 @@ describe('Phase 1 security primitives', () => {
     expect(response.statusCode).toBe(401)
     expect(response.json()).toMatchObject({ code: 'UNAUTHENTICATED' })
   })
+
+  it.each([
+    ['PATCH', 'clients'],
+    ['PATCH', 'projects'],
+    ['PATCH', 'contracts'],
+    ['PATCH', 'time-entries'],
+    ['PATCH', 'milestones'],
+    ['DELETE', 'clients'],
+    ['DELETE', 'projects'],
+    ['DELETE', 'contracts'],
+    ['DELETE', 'time-entries'],
+    ['DELETE', 'milestones'],
+  ] as const)('rejects unauthenticated %s for %s', async (method, resource) => {
+    server = await createServer()
+    const response = await server.inject({
+      method,
+      url: `/api/v1/workspaces/00000000-0000-0000-0000-000000000000/${resource}/11111111-1111-4111-8111-111111111111`,
+      payload: method === 'PATCH' ? { name: 'Updated' } : undefined,
+    })
+    expect(response.statusCode).toBe(401)
+    expect(response.json()).toMatchObject({ code: 'UNAUTHENTICATED' })
+  })
 })
