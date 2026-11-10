@@ -5,6 +5,11 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/components/auth-provider'
 import { RecordRow, workspaceApi } from '@/lib/api'
 
+type RetryAction = {
+  source: RecordRow
+  action: 'connect' | 'verify' | 'disconnect'
+}
+
 export default function IntegrationsPage() {
   const { activeWorkspace } = useAuth()
   const [projects, setProjects] = useState<RecordRow[]>([])
@@ -14,6 +19,7 @@ export default function IntegrationsPage() {
   const [repo, setRepo] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [retryAction, setRetryAction] = useState<RetryAction | null>(null)
   const load = () => {
     if (!activeWorkspace) return
     const api = workspaceApi(activeWorkspace.id)
@@ -30,12 +36,12 @@ export default function IntegrationsPage() {
             })),
           ),
         )
+        setRetryAction(null)
       })
-      .catch((cause) =>
-        setError(
-          cause instanceof Error ? cause.message : 'Integration status could not be loaded.',
-        ),
-      )
+      .catch((cause) => {
+        setRetryAction(null)
+        setError(cause instanceof Error ? cause.message : 'Integration status could not be loaded.')
+      })
   }
   useEffect(load, [activeWorkspace])
   async function mapRepository(event: FormEvent) {
@@ -43,6 +49,7 @@ export default function IntegrationsPage() {
     if (!activeWorkspace) return
     setPending(true)
     setError(null)
+    setRetryAction(null)
     try {
       await workspaceApi(activeWorkspace.id).mapSource(projectId, {
         provider: 'github',
@@ -61,7 +68,9 @@ export default function IntegrationsPage() {
   async function connectSource(source: RecordRow) {
     if (!activeWorkspace || !source.id || !source.project_id) return
     const popup = window.open('', 'vendorproof-github-connect', 'width=520,height=720')
+    setPending(true)
     setError(null)
+    setRetryAction(null)
     try {
       const result = await workspaceApi(activeWorkspace.id).connectSource(
         String(source.project_id),
@@ -71,13 +80,17 @@ export default function IntegrationsPage() {
       else window.location.href = result.url
     } catch (cause) {
       popup?.close()
+      setRetryAction({ source, action: 'connect' })
       setError(cause instanceof Error ? cause.message : 'GitHub connection could not be started.')
+    } finally {
+      setPending(false)
     }
   }
   async function verifySource(source: RecordRow) {
     if (!activeWorkspace || !source.id || !source.project_id) return
     setPending(true)
     setError(null)
+    setRetryAction(null)
     try {
       await workspaceApi(activeWorkspace.id).verifySource(
         String(source.project_id),
@@ -85,6 +98,7 @@ export default function IntegrationsPage() {
       )
       load()
     } catch (cause) {
+      setRetryAction({ source, action: 'verify' })
       setError(cause instanceof Error ? cause.message : 'GitHub access could not be verified.')
     } finally {
       setPending(false)
@@ -94,6 +108,7 @@ export default function IntegrationsPage() {
     if (!activeWorkspace || !source.id || !source.project_id) return
     setPending(true)
     setError(null)
+    setRetryAction(null)
     try {
       await workspaceApi(activeWorkspace.id).disconnectSource(
         String(source.project_id),
@@ -101,10 +116,17 @@ export default function IntegrationsPage() {
       )
       load()
     } catch (cause) {
+      setRetryAction({ source, action: 'disconnect' })
       setError(cause instanceof Error ? cause.message : 'GitHub connection could not be revoked.')
     } finally {
       setPending(false)
     }
+  }
+  function retryFailedAction() {
+    if (!retryAction) return load()
+    if (retryAction.action === 'connect') return void connectSource(retryAction.source)
+    if (retryAction.action === 'verify') return void verifySource(retryAction.source)
+    return void disconnectSource(retryAction.source)
   }
   return (
     <>
@@ -119,7 +141,10 @@ export default function IntegrationsPage() {
       </header>
       {error && (
         <div className="alert alert-error" role="alert">
-          {error} <button onClick={load}>Retry</button>
+          {error}{' '}
+          <button onClick={retryFailedAction}>
+            {retryAction ? `Retry ${retryAction.action}` : 'Retry status'}
+          </button>
         </div>
       )}
       <section className="integration-grid">
@@ -165,7 +190,7 @@ export default function IntegrationsPage() {
                           disabled={pending}
                           onClick={() => connectSource(source)}
                         >
-                          Connect GitHub
+                          {pending ? 'Connecting…' : 'Connect GitHub'}
                         </button>
                         <button
                           className="button button-ghost"

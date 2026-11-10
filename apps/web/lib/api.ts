@@ -49,11 +49,12 @@ export async function apiRequest<T>(
   if (options.body !== undefined) headers.set('Content-Type', 'application/json')
   if (csrfToken && method !== 'GET' && method !== 'HEAD') headers.set('x-csrf-token', csrfToken)
   const { retry = method === 'GET', ...requestOptions } = options
+  const requestUrl = typeof window === 'undefined' ? `${apiBaseUrl}${path}` : path
   let response: Response | undefined
   let lastError: unknown
   for (let attempt = 0; attempt <= (retry ? 1 : 0); attempt += 1) {
     try {
-      response = await fetch(`${apiBaseUrl}${path}`, {
+      response = await fetch(requestUrl, {
         ...requestOptions,
         method,
         headers,
@@ -132,6 +133,17 @@ export function workspaceApi(workspaceId: string) {
       body,
       retry: false,
     })
+  const update = (resource: string, id: string, body: Record<string, unknown>) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/${resource}/${id}`, {
+      method: 'PATCH',
+      body,
+      retry: false,
+    })
+  const remove = (resource: string, id: string) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/${resource}/${id}`, {
+      method: 'DELETE',
+      retry: false,
+    })
   return {
     clients: (signal?: AbortSignal) => collection('clients', signal),
     projects: (signal?: AbortSignal) => collection('projects', signal),
@@ -176,6 +188,17 @@ export function workspaceApi(workspaceId: string) {
         body,
         retry: false,
       }),
+    updateClient: (id: string, body: Record<string, unknown>) => update('clients', id, body),
+    updateProject: (id: string, body: Record<string, unknown>) => update('projects', id, body),
+    updateContract: (id: string, body: Record<string, unknown>) => update('contracts', id, body),
+    updateTimeEntry: (id: string, body: Record<string, unknown>) =>
+      update('time-entries', id, body),
+    updateMilestone: (id: string, body: Record<string, unknown>) => update('milestones', id, body),
+    deleteClient: (id: string) => remove('clients', id),
+    deleteProject: (id: string) => remove('projects', id),
+    deleteContract: (id: string) => remove('contracts', id),
+    deleteTimeEntry: (id: string) => remove('time-entries', id),
+    deleteMilestone: (id: string) => remove('milestones', id),
     activateContract: (id: string) => transition('contracts', `${id}/activate`),
     submitTimeEntry: (id: string) => transition('time-entries', `${id}/submit`),
     approveTimeEntry: (id: string) => transition('time-entries', `${id}/approve`),

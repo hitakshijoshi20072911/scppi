@@ -11,8 +11,10 @@ import {
   requireContext,
   setSessionCookie,
   slugify,
+  setDbContext,
   validatePassword,
   verifyPassword,
+  withDbContext,
 } from '../../modules/core.js'
 
 const uuid = z.string().uuid()
@@ -62,7 +64,6 @@ const timeSchema = z
   .object({
     projectId: uuid,
     contractId: uuid.optional().nullable(),
-    userId: uuid.optional(),
     workDate: z.string().date(),
     durationMinutes: z.number().int().positive().max(1440),
     description: z.string().trim().min(3).max(2000),
@@ -99,37 +100,39 @@ function ok(reply: FastifyReply, data: unknown, status = 200) {
   return reply.status(status).send({ data })
 }
 async function ensureWorkspaceRelation(
+  userId: string,
   workspaceId: string,
   clientId: string,
   projectId?: string | null,
   contractId?: string | null,
 ) {
-  const db = getDatabase()
-  const [client] =
-    await db`select id from client where workspace_id = ${workspaceId} and id = ${clientId} and status <> 'archived'`
-  if (!client)
-    throw Object.assign(new Error('Related client not found'), {
-      statusCode: 404,
-      code: 'NOT_FOUND',
-    })
-  if (projectId) {
-    const [project] =
-      await db`select id from project where workspace_id = ${workspaceId} and id = ${projectId} and client_id = ${clientId}`
-    if (!project)
-      throw Object.assign(new Error('Related project not found'), {
-        statusCode: 422,
-        code: 'RELATIONSHIP_MISMATCH',
+  await withDbContext({ userId, workspaceId }, async (tx) => {
+    const [client] =
+      await tx`select id from client where workspace_id = ${workspaceId} and id = ${clientId} and status <> 'archived'`
+    if (!client)
+      throw Object.assign(new Error('Related client not found'), {
+        statusCode: 404,
+        code: 'NOT_FOUND',
       })
-  }
-  if (contractId) {
-    const [contract] =
-      await db`select id from contract where workspace_id = ${workspaceId} and id = ${contractId} and (project_id is null or project_id = ${projectId ?? null})`
-    if (!contract)
-      throw Object.assign(new Error('Related contract not found'), {
-        statusCode: 422,
-        code: 'RELATIONSHIP_MISMATCH',
-      })
-  }
+    if (projectId) {
+      const [project] =
+        await tx`select id from project where workspace_id = ${workspaceId} and id = ${projectId} and client_id = ${clientId}`
+      if (!project)
+        throw Object.assign(new Error('Related project not found'), {
+          statusCode: 422,
+          code: 'RELATIONSHIP_MISMATCH',
+        })
+    }
+    if (contractId) {
+      const [contract] =
+        await tx`select id from contract where workspace_id = ${workspaceId} and id = ${contractId} and (project_id is null or project_id = ${projectId ?? null})`
+      if (!contract)
+        throw Object.assign(new Error('Related contract not found'), {
+          statusCode: 422,
+          code: 'RELATIONSHIP_MISMATCH',
+        })
+    }
+  })
 }
 async function requireRole(
   request: FastifyRequest,
@@ -151,14 +154,17 @@ export async function phase1Routes(app: FastifyInstance) {
     const email = normaliseEmail(input.email)
     try {
       const result = await db.begin(async (tx) => {
+        await setDbContext(tx, { authEmail: email })
         const [user] =
           await tx`insert into app_user (email, name, password_hash) values (${email}, ${input.name}, ${await hashPassword(input.password)}) returning id, email, name, status, created_at`
+        await setDbContext(tx, { userId: String(user.id) })
         const name = input.workspaceName ?? `${input.name}'s workspace`
         let slug = slugify(name) || `workspace-${user.id.slice(0, 8)}`
         const [existing] = await tx`select id from workspace where slug = ${slug}`
         if (existing) slug = `${slug}-${user.id.slice(0, 8)}`
         const [workspace] =
           await tx`insert into workspace (name, slug, owner_id) values (${name}, ${slug}, ${user.id}) returning id, name, slug, status`
+        await setDbContext(tx, { userId: String(user.id), workspaceId: String(workspace.id) })
         await tx`insert into membership (workspace_id, user_id, role) values (${workspace.id}, ${user.id}, 'owner')`
         return { user, workspace }
       })
@@ -190,8 +196,16 @@ export async function phase1Routes(app: FastifyInstance) {
   })
   app.post('/api/v1/auth/login', async (request, reply) => {
     const input = parse(loginSchema, request.body)
-    const [user] =
-      await getDatabase()`select id, email, name, password_hash, status from app_user where email = ${normaliseEmail(input.email)}`
+    const email = normaliseEmail(input.email)
+    const [user] = await withDbContext({ authEmail: email }, async (tx) => {
+      const [found] =
+        await tx`select id, email, name, password_hash, status from app_user where email = ${email}`
+      if (found) {
+        await setDbContext(tx, { userId: String(found.id), authEmail: email })
+        await tx`update app_user set last_login_at = now(), updated_at = now() where id = ${found.id}`
+      }
+      return found ? [found] : []
+    })
     if (
       !user ||
       user.status !== 'active' ||
@@ -201,7 +215,6 @@ export async function phase1Routes(app: FastifyInstance) {
         statusCode: 401,
         code: 'INVALID_CREDENTIALS',
       })
-    await getDatabase()`update app_user set last_login_at = now(), updated_at = now() where id = ${user.id}`
     const session = await createSession(user.id as string)
     setSessionCookie(reply, session.token)
     reply.header('x-csrf-token', session.csrfToken)
@@ -223,10 +236,17 @@ export async function phase1Routes(app: FastifyInstance) {
         statusCode: 401,
         code: 'UNAUTHENTICATED',
       })
-    const [user] =
-      await getDatabase()`select id, email, name, status, created_at, last_login_at from app_user where id = ${auth.userId}`
-    const workspaces =
-      await getDatabase()`select w.id, w.name, w.slug, m.role from workspace w join membership m on m.workspace_id = w.id where m.user_id = ${auth.userId} and m.status = 'active'`
+    const identity = await withDbContext(
+      { userId: auth.userId, sessionId: auth.sessionId },
+      async (tx) => {
+        const [user] =
+          await tx`select id, email, name, status, created_at, last_login_at from app_user where id = ${auth.userId}`
+        const workspaces =
+          await tx`select w.id, w.name, w.slug, m.role from workspace w join membership m on m.workspace_id = w.id where m.user_id = ${auth.userId} and m.status = 'active'`
+        return { user, workspaces }
+      },
+    )
+    const { user, workspaces } = identity
     return ok(reply, { user, workspaces, csrfToken: auth.csrfToken })
   })
 
@@ -252,8 +272,10 @@ export async function phase1Routes(app: FastifyInstance) {
     const db = getDatabase()
     const slug = body.slug ?? slugify(body.name)
     const result = await db.begin(async (tx) => {
+      await setDbContext(tx, { userId: auth.userId })
       const [workspace] =
         await tx`insert into workspace (name, slug, owner_id) values (${body.name}, ${slug}, ${auth.userId}) returning id, name, slug, status`
+      await setDbContext(tx, { userId: auth.userId, workspaceId: String(workspace.id) })
       await tx`insert into membership (workspace_id, user_id, role) values (${workspace.id}, ${auth.userId}, 'owner')`
       return workspace
     })
@@ -270,11 +292,13 @@ export async function phase1Routes(app: FastifyInstance) {
   })
   app.get('/api/v1/workspaces/:workspaceId/members', async (request, reply) => {
     const { workspaceId } = parse(workspaceParams, request.params)
-    await requireRole(request, workspaceId, 'read')
-    return ok(
-      reply,
-      await getDatabase()`select m.id, m.user_id, u.email, u.name, m.role, m.status, m.created_at from membership m join app_user u on u.id = m.user_id where m.workspace_id = ${workspaceId} and m.status = 'active' order by m.created_at`,
+    const { auth } = await requireRole(request, workspaceId, 'read')
+    const members = await withDbContext(
+      { userId: auth.userId, workspaceId },
+      (tx) =>
+        tx`select m.id, m.user_id, u.email, u.name, m.role, m.status, m.created_at from membership m join app_user u on u.id = m.user_id where m.workspace_id = ${workspaceId} and m.status = 'active' order by m.created_at`,
     )
+    return ok(reply, members)
   })
   app.post('/api/v1/workspaces/:workspaceId/members', async (request, reply) => {
     const { workspaceId } = parse(workspaceParams, request.params)
@@ -283,12 +307,18 @@ export async function phase1Routes(app: FastifyInstance) {
       z.object({ email: z.string().email(), role: z.enum(['admin', 'member']) }).strict(),
       request.body,
     )
-    const [user] =
-      await getDatabase()`select id from app_user where email = ${normaliseEmail(body.email)} and status = 'active'`
-    if (!user)
-      throw Object.assign(new Error('User not found'), { statusCode: 404, code: 'NOT_FOUND' })
-    const [member] =
-      await getDatabase()`insert into membership (workspace_id, user_id, role) values (${workspaceId}, ${user.id}, ${body.role}) returning id, user_id, role, status`
+    const member = await withDbContext(
+      { userId: auth.userId, workspaceId, authEmail: normaliseEmail(body.email) },
+      async (tx) => {
+        const [user] =
+          await tx`select id from app_user where email = ${normaliseEmail(body.email)} and status = 'active'`
+        if (!user)
+          throw Object.assign(new Error('User not found'), { statusCode: 404, code: 'NOT_FOUND' })
+        const [row] =
+          await tx`insert into membership (workspace_id, user_id, role) values (${workspaceId}, ${user.id}, ${body.role}) returning id, user_id, role, status`
+        return row
+      },
+    )
     await audit(
       workspaceId,
       auth.userId,
@@ -308,10 +338,11 @@ export async function phase1Routes(app: FastifyInstance) {
     permission: 'read' | 'write' = 'read',
   ) => {
     const { workspaceId } = parse(workspaceParams, request.params)
-    await requireRole(request, workspaceId, permission)
-    const rows = await getDatabase().unsafe(
-      `select * from ${table} where workspace_id = $1 order by created_at desc`,
-      [workspaceId],
+    const { auth } = await requireRole(request, workspaceId, permission)
+    const rows = await withDbContext({ userId: auth.userId, workspaceId }, (tx) =>
+      tx.unsafe(`select * from ${table} where workspace_id = $1 order by created_at desc`, [
+        workspaceId,
+      ]),
     )
     return ok(reply, rows)
   }
@@ -325,8 +356,11 @@ export async function phase1Routes(app: FastifyInstance) {
     const { workspaceId } = parse(workspaceParams, request.params)
     const { auth } = await requireRole(request, workspaceId, 'write')
     const b = parse(clientSchema, request.body)
-    const [row] =
-      await getDatabase()`insert into client (workspace_id, name, contact_email, notes) values (${workspaceId}, ${b.name}, ${b.contactEmail ?? null}, ${b.notes ?? null}) returning *`
+    const [row] = await withDbContext(
+      { userId: auth.userId, workspaceId },
+      (tx) =>
+        tx`insert into client (workspace_id, name, contact_email, notes) values (${workspaceId}, ${b.name}, ${b.contactEmail ?? null}, ${b.notes ?? null}) returning *`,
+    )
     await audit(
       workspaceId,
       auth.userId,
@@ -342,12 +376,13 @@ export async function phase1Routes(app: FastifyInstance) {
     const { workspaceId } = parse(workspaceParams, request.params)
     const { auth } = await requireRole(request, workspaceId, 'write')
     const b = parse(projectSchema, request.body)
-    const [client] =
-      await getDatabase()`select id from client where workspace_id = ${workspaceId} and id = ${b.clientId} and status = 'active'`
-    if (!client)
-      throw Object.assign(new Error('Client not found'), { statusCode: 404, code: 'NOT_FOUND' })
-    const [row] =
-      await getDatabase()`insert into project (workspace_id, client_id, name, description, start_date, target_end_date, created_by, updated_by) values (${workspaceId}, ${b.clientId}, ${b.name}, ${b.description ?? null}, ${b.startDate ?? null}, ${b.targetEndDate ?? null}, ${auth.userId}, ${auth.userId}) returning *`
+    const [row] = await withDbContext({ userId: auth.userId, workspaceId }, async (tx) => {
+      const [client] =
+        await tx`select id from client where workspace_id = ${workspaceId} and id = ${b.clientId} and status = 'active'`
+      if (!client)
+        throw Object.assign(new Error('Client not found'), { statusCode: 404, code: 'NOT_FOUND' })
+      return tx`insert into project (workspace_id, client_id, name, description, start_date, target_end_date, created_by, updated_by) values (${workspaceId}, ${b.clientId}, ${b.name}, ${b.description ?? null}, ${b.startDate ?? null}, ${b.targetEndDate ?? null}, ${auth.userId}, ${auth.userId}) returning *`
+    })
     await audit(
       workspaceId,
       auth.userId,
@@ -373,9 +408,12 @@ export async function phase1Routes(app: FastifyInstance) {
         statusCode: 422,
         code: 'INVALID_CONTRACT',
       })
-    await ensureWorkspaceRelation(workspaceId, b.clientId, b.projectId)
-    const [row] =
-      await getDatabase()`insert into contract (workspace_id, client_id, project_id, reference, title, description, billing_model, currency, hourly_rate_minor, contract_value_minor, effective_date, end_date, created_by) values (${workspaceId}, ${b.clientId}, ${b.projectId ?? null}, ${b.reference}, ${b.title}, ${b.description ?? null}, ${b.billingModel}, ${b.currency}, ${b.hourlyRateMinor ?? null}, ${b.contractValueMinor ?? null}, ${b.effectiveDate}, ${b.endDate ?? null}, ${auth.userId}) returning *`
+    await ensureWorkspaceRelation(auth.userId, workspaceId, b.clientId, b.projectId)
+    const [row] = await withDbContext(
+      { userId: auth.userId, workspaceId },
+      (tx) =>
+        tx`insert into contract (workspace_id, client_id, project_id, reference, title, description, billing_model, currency, hourly_rate_minor, contract_value_minor, effective_date, end_date, created_by) values (${workspaceId}, ${b.clientId}, ${b.projectId ?? null}, ${b.reference}, ${b.title}, ${b.description ?? null}, ${b.billingModel}, ${b.currency}, ${b.hourlyRateMinor ?? null}, ${b.contractValueMinor ?? null}, ${b.effectiveDate}, ${b.endDate ?? null}, ${auth.userId}) returning *`,
+    )
     await audit(
       workspaceId,
       auth.userId,
@@ -391,8 +429,11 @@ export async function phase1Routes(app: FastifyInstance) {
     const { workspaceId } = parse(workspaceParams, request.params)
     const { auth } = await requireRole(request, workspaceId, 'write')
     const b = parse(timeSchema, request.body)
-    const [project] =
-      await getDatabase()`select id, status from project where workspace_id = ${workspaceId} and id = ${b.projectId}`
+    const [project] = await withDbContext(
+      { userId: auth.userId, workspaceId },
+      (tx) =>
+        tx`select id, client_id, status from project where workspace_id = ${workspaceId} and id = ${b.projectId}`,
+    )
     if (!project || project.status === 'archived')
       throw Object.assign(new Error('Project unavailable'), {
         statusCode: 422,
@@ -400,14 +441,17 @@ export async function phase1Routes(app: FastifyInstance) {
       })
     if (b.contractId)
       await ensureWorkspaceRelation(
+        auth.userId,
         workspaceId,
-        (await getDatabase()`select client_id from project where id = ${b.projectId}`)[0]
-          ?.client_id as string,
+        String(project.client_id),
         b.projectId,
         b.contractId,
       )
-    const [row] =
-      await getDatabase()`insert into time_entry (workspace_id, project_id, contract_id, user_id, work_date, duration_minutes, description, billable) values (${workspaceId}, ${b.projectId}, ${b.contractId ?? null}, ${b.userId ?? auth.userId}, ${b.workDate}, ${b.durationMinutes}, ${b.description}, ${b.billable ?? true}) returning *`
+    const [row] = await withDbContext(
+      { userId: auth.userId, workspaceId },
+      (tx) =>
+        tx`insert into time_entry (workspace_id, project_id, contract_id, user_id, work_date, duration_minutes, description, billable) values (${workspaceId}, ${b.projectId}, ${b.contractId ?? null}, ${auth.userId}, ${b.workDate}, ${b.durationMinutes}, ${b.description}, ${b.billable ?? true}) returning *`,
+    )
     await audit(
       workspaceId,
       auth.userId,
@@ -423,23 +467,24 @@ export async function phase1Routes(app: FastifyInstance) {
     const { workspaceId } = parse(workspaceParams, request.params)
     const { auth } = await requireRole(request, workspaceId, 'write')
     const b = parse(milestoneSchema, request.body)
-    const [project] =
-      await getDatabase()`select id from project where workspace_id = ${workspaceId} and id = ${b.projectId}`
-    if (!project)
-      throw Object.assign(new Error('Project not found'), { statusCode: 404, code: 'NOT_FOUND' })
-    const [contract] =
-      await getDatabase()`select id, billing_model, currency from contract where workspace_id = ${workspaceId} and id = ${b.contractId} and project_id = ${b.projectId}`
-    if (
-      !contract ||
-      contract.billing_model !== 'fixed_milestone' ||
-      contract.currency !== b.currency
-    )
-      throw Object.assign(new Error('Contract relationship or currency is invalid'), {
-        statusCode: 422,
-        code: 'RELATIONSHIP_MISMATCH',
-      })
-    const [row] =
-      await getDatabase()`insert into milestone (workspace_id, project_id, contract_id, title, description, amount_minor, currency, due_date, created_by) values (${workspaceId}, ${b.projectId}, ${b.contractId}, ${b.title}, ${b.description ?? null}, ${b.amountMinor}, ${b.currency}, ${b.dueDate ?? null}, ${auth.userId}) returning *`
+    const [row] = await withDbContext({ userId: auth.userId, workspaceId }, async (tx) => {
+      const [project] =
+        await tx`select id from project where workspace_id = ${workspaceId} and id = ${b.projectId}`
+      if (!project)
+        throw Object.assign(new Error('Project not found'), { statusCode: 404, code: 'NOT_FOUND' })
+      const [contract] =
+        await tx`select id, billing_model, currency from contract where workspace_id = ${workspaceId} and id = ${b.contractId} and project_id = ${b.projectId}`
+      if (
+        !contract ||
+        contract.billing_model !== 'fixed_milestone' ||
+        contract.currency !== b.currency
+      )
+        throw Object.assign(new Error('Contract relationship or currency is invalid'), {
+          statusCode: 422,
+          code: 'RELATIONSHIP_MISMATCH',
+        })
+      return tx`insert into milestone (workspace_id, project_id, contract_id, title, description, amount_minor, currency, due_date, created_by) values (${workspaceId}, ${b.projectId}, ${b.contractId}, ${b.title}, ${b.description ?? null}, ${b.amountMinor}, ${b.currency}, ${b.dueDate ?? null}, ${auth.userId}) returning *`
+    })
     await audit(
       workspaceId,
       auth.userId,
@@ -468,8 +513,11 @@ export async function phase1Routes(app: FastifyInstance) {
     const { workspaceId, id: entryId } = params(request)
     const { auth } = await requireRole(request, workspaceId, 'approve')
     const b = parse(rejectSchema, request.body)
-    const [row] =
-      await getDatabase()`update time_entry set status = 'rejected', rejection_reason = ${b.reason}, reviewer_id = ${auth.userId}, reviewed_at = now(), updated_at = now() where workspace_id = ${workspaceId} and id = ${entryId} and status = 'submitted' returning *`
+    const [row] = await withDbContext(
+      { userId: auth.userId, workspaceId },
+      (tx) =>
+        tx`update time_entry set status = 'rejected', rejection_reason = ${b.reason}, reviewer_id = ${auth.userId}, reviewed_at = now(), updated_at = now() where workspace_id = ${workspaceId} and id = ${entryId} and status = 'submitted' returning *`,
+    )
     if (!row)
       throw Object.assign(new Error('Invalid time-entry transition'), {
         statusCode: 409,
@@ -492,12 +540,212 @@ export async function phase1Routes(app: FastifyInstance) {
   app.post('/api/v1/workspaces/:workspaceId/milestones/:id/accept', async (request, reply) =>
     transition(request, reply, 'milestone', 'accepted', 'approve'),
   )
+  const updateSchemas = {
+    clients: clientSchema.partial(),
+    projects: projectSchema.partial(),
+    contracts: contractSchema.partial(),
+    'time-entries': timeSchema.partial(),
+    milestones: milestoneSchema.partial(),
+  } as const
+  const entityTables = {
+    clients: 'client',
+    projects: 'project',
+    contracts: 'contract',
+    'time-entries': 'time_entry',
+    milestones: 'milestone',
+  } as const
+  const fields: Record<string, Record<string, string>> = {
+    clients: { name: 'name', contactEmail: 'contact_email', notes: 'notes' },
+    projects: {
+      clientId: 'client_id',
+      name: 'name',
+      description: 'description',
+      startDate: 'start_date',
+      targetEndDate: 'target_end_date',
+    },
+    contracts: {
+      clientId: 'client_id',
+      projectId: 'project_id',
+      reference: 'reference',
+      title: 'title',
+      description: 'description',
+      billingModel: 'billing_model',
+      currency: 'currency',
+      hourlyRateMinor: 'hourly_rate_minor',
+      contractValueMinor: 'contract_value_minor',
+      effectiveDate: 'effective_date',
+      endDate: 'end_date',
+    },
+    'time-entries': {
+      projectId: 'project_id',
+      contractId: 'contract_id',
+      workDate: 'work_date',
+      durationMinutes: 'duration_minutes',
+      description: 'description',
+      billable: 'billable',
+    },
+    milestones: {
+      projectId: 'project_id',
+      contractId: 'contract_id',
+      title: 'title',
+      description: 'description',
+      amountMinor: 'amount_minor',
+      currency: 'currency',
+      dueDate: 'due_date',
+    },
+  }
+  app.patch('/api/v1/workspaces/:workspaceId/:resource/:id', async (request, reply) => {
+    const { workspaceId, id } = parse(resourceParams, request.params)
+    const resource = (request.params as { resource?: string }).resource ?? ''
+    if (!Object.hasOwn(entityTables, resource))
+      throw Object.assign(new Error('Not found'), { statusCode: 404, code: 'NOT_FOUND' })
+    const key = resource as keyof typeof entityTables
+    const { auth } = await requireRole(request, workspaceId, 'write')
+    const input = parse(
+      updateSchemas[key] as unknown as z.ZodType<Record<string, unknown>>,
+      request.body,
+    )
+    if (!Object.keys(input).length)
+      throw Object.assign(new Error('At least one field is required'), {
+        statusCode: 422,
+        code: 'VALIDATION_ERROR',
+      })
+    if (
+      key === 'contracts' &&
+      ((input.billingModel === 'hourly' && input.hourlyRateMinor === undefined) ||
+        (input.billingModel === 'fixed_milestone' && input.contractValueMinor === undefined))
+    )
+      throw Object.assign(new Error('Billing model requires its corresponding rate or value'), {
+        statusCode: 422,
+        code: 'INVALID_CONTRACT',
+      })
+    const table = entityTables[key]
+    const [before] = await withDbContext({ userId: auth.userId, workspaceId }, (tx) =>
+      tx.unsafe(`select * from ${table} where workspace_id = $1 and id = $2`, [workspaceId, id]),
+    )
+    if (!before)
+      throw Object.assign(new Error('Record not found'), { statusCode: 404, code: 'NOT_FOUND' })
+    const draftOnly = ['contracts', 'time-entries', 'milestones'].includes(key)
+    if (draftOnly && before.status !== 'draft')
+      throw Object.assign(new Error('Only draft records can be edited'), {
+        statusCode: 409,
+        code: 'INVALID_STATE',
+      })
+    if (key === 'projects' && input.clientId)
+      await ensureWorkspaceRelation(auth.userId, workspaceId, String(input.clientId))
+    if (key === 'contracts')
+      await ensureWorkspaceRelation(
+        auth.userId,
+        workspaceId,
+        String(input.clientId ?? before.client_id),
+        input.projectId === undefined ? before.project_id : (input.projectId as string | null),
+      )
+    if (key === 'time-entries') {
+      const projectId = String(input.projectId ?? before.project_id)
+      const [project] = await withDbContext(
+        { userId: auth.userId, workspaceId },
+        (tx) =>
+          tx`select id, client_id from project where workspace_id = ${workspaceId} and id = ${projectId}`,
+      )
+      if (!project)
+        throw Object.assign(new Error('Project not found'), {
+          statusCode: 422,
+          code: 'RELATIONSHIP_MISMATCH',
+        })
+      const contractId = input.contractId === undefined ? before.contract_id : input.contractId
+      if (contractId)
+        await ensureWorkspaceRelation(
+          auth.userId,
+          workspaceId,
+          String(project.client_id),
+          projectId,
+          String(contractId),
+        )
+    }
+    if (key === 'milestones') {
+      const projectId = String(input.projectId ?? before.project_id)
+      const contractId = String(input.contractId ?? before.contract_id)
+      const [contract] = await withDbContext(
+        { userId: auth.userId, workspaceId },
+        (tx) =>
+          tx`select id, project_id, billing_model, currency from contract where workspace_id = ${workspaceId} and id = ${contractId}`,
+      )
+      if (
+        !contract ||
+        contract.project_id !== projectId ||
+        contract.billing_model !== 'fixed_milestone' ||
+        contract.currency !== (input.currency ?? before.currency)
+      )
+        throw Object.assign(new Error('Milestone contract relationship or currency is invalid'), {
+          statusCode: 422,
+          code: 'RELATIONSHIP_MISMATCH',
+        })
+    }
+    const entries = Object.entries(input).filter(([k]) => fields[key][k])
+    const values = entries.map(([, v]) => v)
+    const setClause = entries.map(([k], i) => `${fields[key][k]} = $${i + 1}`).join(', ')
+    const [row] = await withDbContext({ userId: auth.userId, workspaceId }, (tx) =>
+      tx.unsafe(
+        `update ${table} set ${setClause}, updated_at = now() where workspace_id = $${values.length + 1} and id = $${values.length + 2} returning *`,
+        [...values, workspaceId, id] as (string | number | boolean | null)[],
+      ),
+    )
+    await audit(workspaceId, auth.userId, `${table}.updated`, table, id, row, request.id, before)
+    return ok(reply, row)
+  })
+  app.delete('/api/v1/workspaces/:workspaceId/:resource/:id', async (request, reply) => {
+    const { workspaceId, id } = parse(resourceParams, request.params)
+    const resource = (request.params as { resource?: string }).resource ?? ''
+    if (!Object.hasOwn(entityTables, resource))
+      throw Object.assign(new Error('Not found'), { statusCode: 404, code: 'NOT_FOUND' })
+    const key = resource as keyof typeof entityTables
+    const { auth } = await requireRole(request, workspaceId, 'write')
+    const table = entityTables[key]
+    const [before] = await withDbContext({ userId: auth.userId, workspaceId }, (tx) =>
+      tx.unsafe(`select * from ${table} where workspace_id = $1 and id = $2`, [workspaceId, id]),
+    )
+    if (!before)
+      throw Object.assign(new Error('Record not found'), { statusCode: 404, code: 'NOT_FOUND' })
+    if (key === 'clients' || key === 'projects' || key === 'contracts' || key === 'milestones') {
+      if (before.status === 'archived')
+        throw Object.assign(new Error('Record is already archived'), {
+          statusCode: 409,
+          code: 'INVALID_STATE',
+        })
+      const [row] = await withDbContext({ userId: auth.userId, workspaceId }, (tx) =>
+        tx.unsafe(
+          `update ${table} set status = 'archived', updated_at = now() where workspace_id = $1 and id = $2 returning *`,
+          [workspaceId, id],
+        ),
+      )
+      await audit(workspaceId, auth.userId, `${table}.archived`, table, id, row, request.id, before)
+      return ok(reply, row)
+    }
+    if (before.status !== 'draft')
+      throw Object.assign(new Error('Only draft time entries can be deleted'), {
+        statusCode: 409,
+        code: 'INVALID_STATE',
+      })
+    const [row] = await withDbContext({ userId: auth.userId, workspaceId }, (tx) =>
+      tx.unsafe(`delete from ${table} where workspace_id = $1 and id = $2 returning *`, [
+        workspaceId,
+        id,
+      ]),
+    )
+    await audit(workspaceId, auth.userId, `${table}.deleted`, table, id, before, request.id)
+    return ok(reply, row)
+  })
+
   app.get('/api/v1/workspaces/:workspaceId/audit-events', async (request, reply) => {
     const { workspaceId } = parse(workspaceParams, request.params)
-    await requireRole(request, workspaceId, 'read')
+    const { auth } = await requireRole(request, workspaceId, 'read')
     return ok(
       reply,
-      await getDatabase()`select id, actor_user_id, action, entity_type, entity_id, before_data, after_data, request_id, created_at from audit_event where workspace_id = ${workspaceId} order by created_at desc limit 100`,
+      await withDbContext(
+        { userId: auth.userId, workspaceId },
+        (tx) =>
+          tx`select id, actor_user_id, action, entity_type, entity_id, before_data, after_data, request_id, created_at from audit_event where workspace_id = ${workspaceId} order by created_at desc limit 100`,
+      ),
     )
   })
 }
@@ -526,13 +774,9 @@ async function transition(
           ? ', accepted_by = $2, accepted_at = now()'
           : ''
   const query = `update ${table} set status = $1, updated_at = now()${extra} where workspace_id = $3 and id = $4 and status = any($5::varchar[]) returning *`
-  const [row] = await getDatabase().unsafe(query, [
-    next,
-    auth.userId,
-    workspaceId,
-    entityId,
-    previous,
-  ])
+  const [row] = await withDbContext({ userId: auth.userId, workspaceId }, (tx) =>
+    tx.unsafe(query, [next, auth.userId, workspaceId, entityId, previous]),
+  )
   if (!row)
     throw Object.assign(new Error('Invalid state transition or record not found'), {
       statusCode: 409,

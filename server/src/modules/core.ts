@@ -7,6 +7,7 @@ import {
 } from 'node:crypto'
 import { promisify } from 'node:util'
 import type { FastifyRequest } from 'fastify'
+import type { TransactionSql } from 'postgres'
 import { getDatabase } from '../db/client.js'
 import { config } from '../platform/config.js'
 
@@ -19,6 +20,35 @@ export type AuthContext = {
   authenticatedAt: Date
 }
 const hashToken = (v: string) => createHash('sha256').update(v).digest('hex')
+
+/** Set only transaction-local values: pooled connections never retain identity across requests. */
+export async function setDbContext(
+  tx: TransactionSql,
+  context: {
+    userId?: string | null
+    sessionId?: string | null
+    workspaceId?: string | null
+    authEmail?: string | null
+    sessionTokenHash?: string | null
+  },
+) {
+  await tx`select
+    set_config('app.user_id', ${context.userId ?? ''}, true),
+    set_config('app.session_id', ${context.sessionId ?? ''}, true),
+    set_config('app.workspace_id', ${context.workspaceId ?? ''}, true),
+    set_config('app.auth_email', ${context.authEmail ?? ''}, true),
+    set_config('app.session_token_hash', ${context.sessionTokenHash ?? ''}, true)`
+}
+export async function withDbContext<T>(
+  context: Parameters<typeof setDbContext>[1],
+  action: (tx: TransactionSql) => Promise<T>,
+): Promise<T> {
+  const result = await getDatabase().begin(async (tx) => {
+    await setDbContext(tx, context)
+    return action(tx)
+  })
+  return result as unknown as T
+}
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString('hex')
   const key = (await scrypt(password, salt, 64)) as Buffer
@@ -76,11 +106,13 @@ export function clearSessionCookie(reply: { header: (name: string, value: string
   )
 }
 export async function createSession(userId: string) {
-  const db = getDatabase()
   const token = randomBytes(32).toString('base64url')
   const csrf = randomBytes(32).toString('base64url')
-  const [row] =
-    await db`insert into session (user_id, token_hash, csrf_token, expires_at) values (${userId}, ${hashToken(token)}, ${csrf}, now() + interval '7 days') returning id, csrf_token, last_authenticated_at`
+  const [row] = await withDbContext(
+    { userId },
+    (tx) =>
+      tx`insert into session (user_id, token_hash, csrf_token, expires_at) values (${userId}, ${hashToken(token)}, ${csrf}, now() + interval '7 days') returning id, csrf_token, last_authenticated_at`,
+  )
   return {
     token,
     sessionId: row.id as string,
@@ -91,9 +123,14 @@ export async function createSession(userId: string) {
 export async function authenticate(request: FastifyRequest): Promise<AuthContext | undefined> {
   const token = getCookie(request, '__Host-vendorproof_session')
   if (!token) return undefined
-  const db = getDatabase()
-  const [row] =
-    await db`select id, user_id, csrf_token, last_authenticated_at from session where token_hash = ${hashToken(token)} and revoked_at is null and expires_at > now()`
+  const tokenHash = hashToken(token)
+  const [row] = await withDbContext({ sessionTokenHash: tokenHash }, async (tx) => {
+    const [session] =
+      await tx`select id, user_id, csrf_token, last_authenticated_at from session where token_hash = ${tokenHash} and revoked_at is null and expires_at > now()`
+    if (session)
+      await setDbContext(tx, { userId: String(session.user_id), sessionId: String(session.id) })
+    return session ? [session] : []
+  })
   return row
     ? {
         userId: row.user_id as string,
@@ -104,11 +141,18 @@ export async function authenticate(request: FastifyRequest): Promise<AuthContext
     : undefined
 }
 export async function revokeSession(ctx: AuthContext) {
-  await getDatabase()`update session set revoked_at = now() where id = ${ctx.sessionId}`
+  await withDbContext(
+    { userId: ctx.userId, sessionId: ctx.sessionId },
+    (tx) =>
+      tx`update session set revoked_at = now() where id = ${ctx.sessionId} and user_id = ${ctx.userId} and revoked_at is null`,
+  )
 }
 export async function workspaceRole(userId: string, workspaceId: string) {
-  const [row] =
-    await getDatabase()`select role from membership where user_id = ${userId} and workspace_id = ${workspaceId} and status = 'active'`
+  const [row] = await withDbContext(
+    { userId, workspaceId },
+    (tx) =>
+      tx`select role from membership where user_id = ${userId} and workspace_id = ${workspaceId} and status = 'active'`,
+  )
   return row?.role as Role | undefined
 }
 export function can(role: Role | undefined, permission: 'read' | 'write' | 'approve' | 'manage') {
@@ -149,7 +193,11 @@ export async function audit(
   requestId?: string,
   before?: unknown,
 ) {
-  await getDatabase()`insert into audit_event (workspace_id, actor_user_id, action, entity_type, entity_id, before_data, after_data, request_id) values (${workspaceId}, ${actor}, ${action}, ${entityType}, ${entityId}, ${before ? JSON.stringify(before) : null}, ${after ? JSON.stringify(after) : null}, ${requestId ?? null})`
+  await withDbContext(
+    { userId: actor, workspaceId },
+    (tx) =>
+      tx`insert into audit_event (workspace_id, actor_user_id, action, entity_type, entity_id, before_data, after_data, request_id) values (${workspaceId}, ${actor}, ${action}, ${entityType}, ${entityId}, ${before ? JSON.stringify(before) : null}, ${after ? JSON.stringify(after) : null}, ${requestId ?? null})`,
+  )
 }
 export function id(value: unknown) {
   return typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value) ? value : undefined

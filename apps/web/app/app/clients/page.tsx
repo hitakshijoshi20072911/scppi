@@ -94,7 +94,52 @@ export default function ClientsPage() {
                   <strong>{String(client.name ?? 'Unnamed client')}</strong>
                   <small>{String(client.contact_email ?? 'No contact email')}</small>
                 </div>
-                <span className="record-status">{String(client.status ?? 'active')}</span>
+                <div className="record-actions">
+                  <span className="record-status">{String(client.status ?? 'active')}</span>
+                  {client.status !== 'archived' && (
+                    <>
+                      <button
+                        className="text-button"
+                        onClick={async () => {
+                          const name = window.prompt('Client name', String(client.name ?? ''))
+                          if (name === null || !name.trim() || !activeWorkspace) return
+                          try {
+                            await workspaceApi(activeWorkspace.id).updateClient(String(client.id), {
+                              name,
+                            })
+                            load()
+                          } catch (cause) {
+                            setError(
+                              cause instanceof Error
+                                ? cause.message
+                                : 'Client could not be updated.',
+                            )
+                          }
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="text-button"
+                        onClick={async () => {
+                          if (!window.confirm('Archive this client?')) return
+                          try {
+                            await workspaceApi(activeWorkspace!.id).deleteClient(String(client.id))
+                            load()
+                          } catch (cause) {
+                            setError(
+                              cause instanceof Error
+                                ? cause.message
+                                : 'Client could not be archived.',
+                            )
+                          }
+                        }}
+                      >
+                        Archive
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>

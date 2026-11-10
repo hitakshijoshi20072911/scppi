@@ -14,6 +14,13 @@ describe('Phase 2 route access controls', () => {
       'GET',
       '/api/v1/workspaces/11111111-1111-4111-8111-111111111111/projects/22222222-2222-4222-8222-222222222222/sources',
     ],
+    ...(['connect', 'verify', 'disconnect'] as const).map(
+      (action) =>
+        [
+          'POST' as const,
+          `/api/v1/workspaces/11111111-1111-4111-8111-111111111111/projects/22222222-2222-4222-8222-222222222222/sources/33333333-3333-4333-8333-333333333333/${action}`,
+        ] as const,
+    ),
     [
       'POST',
       '/api/v1/workspaces/11111111-1111-4111-8111-111111111111/projects/22222222-2222-4222-8222-222222222222/runs',

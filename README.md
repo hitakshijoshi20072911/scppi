@@ -2,77 +2,132 @@
 
 **Verified work. Traceable invoices.**
 
-VendorProof is a work-to-invoice reconciliation platform for technical freelancers and software agencies. It is intended to connect engineering delivery evidence with human-approved time records or fixed-price milestones so future invoice lines can be reviewed and traced.
+VendorProof is a work-to-invoice reconciliation SaaS for independent software consultants, technical freelancers, and small engineering agencies. It links repository activity and human-approved time or milestone evidence to reviewable invoice previews. The product is designed to make billing easier to explain—not to treat code activity as proof of billable hours.
 
-## Current status
+**Repository:** [hitakshijoshi20072911/scppi](https://github.com/hitakshijoshi20072911/scppi)
+**Product name:** VendorProof
+**Tags:** SaaS, freelancer invoicing, agency operations, work evidence, GitHub, reconciliation, audit trail, approval workflow, PostgreSQL, Next.js, Fastify
+**Status:** Stage 5 recovery and hardening is in progress; this branch is not deployed or verified as a complete hosted product.
 
-Repository: [hitakshijoshi20072911/scppi](https://github.com/hitakshijoshi20072911/scppi). Phase 1–3 code is merged to `main` (latest audited commit: `95a7ef1` on 2026-11-05). Current source includes PostgreSQL-backed authentication and workspace records; client, project, contract, time-entry, milestone, GitHub evidence/reconciliation, and invoice-preview/review flows; and the public fictional demo. See the phase documents for precise scope.
+## Problem and intended users
 
-Verification at the latest Stage 5 read-only audit (2026-11-05): format, lint, server/web typecheck, 49 backend unit tests, 6 Playwright tests, server/web production builds, static migration metadata check, and production dependency audit passed. These local checks do **not** establish that a hosted database is migrated, RLS works under the restricted runtime role, or authenticated CRUD works against staging.
+Consultants and small agencies often reconstruct work from pull requests, time trackers, notes, contracts, and spreadsheets when billing. Evidence becomes scattered, client scope is hard to audit, and invoice disputes can arise because there is no clear link between an agreement, accepted work, and an amount. VendorProof aims to provide a workspace where those relationships are explicit and reviewable.
 
-Deployment and provider state must be treated as unverified until checked in the owners' dashboards and against isolated staging. A public GET of the documented Vercel URL returned HTTP 200 during this audit; the documented Render `/health/live` and `/health/ready` requests timed out. No staging migration, restricted-role RLS test, hosted authenticated CRUD, live GitHub OAuth execution, Stripe draft operation, or Google Calendar call was performed. Stripe external writes and PDF export are not implemented; Google Calendar support is not verified. Never use a production database as staging or describe mocks/static checks as provider verification.
+The central rules are deliberate: GitHub activity is evidence of engineering activity, never a substitute for approved hours; amounts come from contract terms and approved time entries or accepted fixed-price milestones; calculations use integer minor units; and an authorized human must review an invoice preview before any financial provider operation.
 
-The repository contains additive migrations through `0004_phase3_invoice_approval.sql`. The README's previous statement that the schema remained a Phase 0 sentinel is stale. Whether the hosted database has applied these migrations is unknown here. A controlled isolated staging database and rotated credentials are required before remote validation or migrations.
+## Current implementation and verified status
 
-## Architecture
+The repository contains a Next.js public site and fictional demo; account/session and workspace APIs; client, project, contract, time-entry, milestone and audit-event APIs; repository mapping and GitHub evidence/reconciliation code; and an immutable invoice-preview/review workflow. Stage 5 source changes include CRUD/session reliability work, exact-origin handling and a same-origin API proxy, tenant RLS context work, and isolated fake-tested Swytchcode adapters for GitHub, Stripe draft invoices, and a dedicated Google Calendar reminder calendar. These are code changes only until reviewed, migrated, connected and deployed.
 
-```text
-Vercel: apps/web (Next.js)
-        │ HTTPS / exact CORS origin
-        ▼
-Render: Fastify API (server)
-        │ DATABASE_URL secret
-        ▼
-Supabase: PostgreSQL
+**Local verification on 2026-11-07:** TypeScript typecheck passed; 75 backend unit tests passed; lint and Prettier checks passed; production web/server build passed; 6 Playwright smoke/demo/routing tests passed; and `npm audit --omit=dev --audit-level=high` reported 0 vulnerabilities. These checks do not prove hosted authenticated CRUD, live provider calls, or database policy behavior.
 
-Render background worker: deferred until durable jobs are implemented
+**Hosted verification:** The current public Vercel homepage and Render `/health/live` and `/health/ready` endpoints returned HTTP 200; the API readiness response reported the database ready. The authenticated application workflow has not passed a complete hosted end-to-end test. Both designated Supabase projects are healthy, but their application migration ledgers contain only migrations `0000`–`0002`. The repository requires `0003_commit_provenance.sql` and `0004_phase3_invoice_approval.sql` for later evidence and invoice features; hosted schema inventory confirms the invoice tables are absent. The Supabase staging project is on the Free plan, which explicitly has no scheduled project backups. No schema migration has been applied as part of this work.
+
+**Release blockers:** A recoverable logical backup and safe rotation of the previously exposed database credentials are required before database changes; Supabase plan upgrade is not authorized. Swytchcode owner GitHub OAuth currently reports expired, and the previously pasted Swytchcode token requires rotation. Stripe's connected account is test-mode in the Stripe connector, but Stripe is not verified through the required Swytchcode runtime. Google Calendar OAuth through Swytchcode is not verified. No Stage 5 source changes have been committed, pushed, merged, or deployed. Do not treat the public health checks or mocked tests as proof that the product is production-ready.
+
+## Product scope and limitations
+
+Implemented foundations include workspace authorization, records for clients/projects/contracts, human-entered time and milestones, repository mapping, reconciliation state transitions, audit events, deterministic invoice previews, immutable review decisions, and source-level integration adapters. The public demo is fictional and deterministic; it does not create real records.
+
+Current limitations include pending hosted database migrations, pending restricted-role RLS integration verification, pending hosted CRUD/session verification, pending OAuth/API-key setup via Swytchcode, and pending end-to-end tests against isolated hosted data. Stripe support is limited to a _test-mode draft_ workflow in code; it must never finalize or send invoices, charge a payment method, refund, or pay out. Calendar reminders are designed for a VendorProof-created calendar only, not unrelated personal calendars. There is no implemented production worker/queue, subscription billing, accounting export, tax/VAT computation, client portal, guaranteed email delivery, or legal/accounting advice. Do not use real customer/financial data until the explicit release gates in the deployment guide have passed.
+
+## System architecture
+
+```mermaid
+flowchart LR
+  B[Browser] -->|HTTPS, same-origin /api proxy| V[Vercel: Next.js apps/web]
+  V -->|HTTPS, exact-origin allowlist| R[Render: Fastify API]
+  R -->|DATABASE_URL secret| S[(Supabase PostgreSQL)]
+  R -->|Official Swytchcode Runtime, server-only token| W[GitHub / Stripe test / Google Calendar]
+  R -. future durable jobs .-> Q[Worker / queue not provisioned]
 ```
 
-The application remains a modular monolith. API and future worker processes share one TypeScript codebase and the PostgreSQL database. Phase 2 exposes a server-side Swytchcode executor injection point and defaults to a fail-closed unavailable executor; direct provider HTTP/SDK calls are prohibited. The frontend never holds provider credentials or calls providers directly.
+VendorProof is a TypeScript modular monolith: `apps/web` is the browser client, `server` hosts the Fastify API and future worker entrypoint, and `packages/shared` holds shared validation/types. The browser never receives database or provider credentials. The API derives the workspace/tenant from the authenticated session and invokes external providers only through the Swytchcode Runtime. An absent/misconfigured integration must fail closed; there is no direct-provider fallback. Vercel and Render are existing services, but this branch's proxy/origin changes have not been deployed.
 
-## Repository structure
+### Trust and data flow
 
-- `apps/web/` — Next.js frontend, product landing, demo, authenticated shell, and API-backed management screens.
-- `server/` — Fastify API, future worker entrypoint, Drizzle config, and migrations.
-- `packages/shared/` — shared validation contracts and types.
-- `docs/` — architecture, deployment, security, operations, testing, and roadmap documentation.
-- `server/src/lenis/` — preserved browser-only Lenis source; not backend runtime code.
-- `.swytchcode/` — downloaded provider definitions and sandbox configuration; downloaded schemas are not proof of authenticated or executed provider calls.
+1. The user signs in and receives an HTTP-only secure session cookie; mutation requests also require the session-bound CSRF token and an allowed exact origin.
+2. The API resolves the user's active workspace membership and role, validates request schemas, and uses transaction-local database context for workspace/user/session identity.
+3. Source records and invoice previews are persisted in PostgreSQL. Evidence is mapped to projects and reconciled deterministically; human decisions are versioned and audited.
+4. Only after the relevant user approval may the server attempt an explicitly allowed provider action. Provider responses and ambiguous writes are handled as untrusted data; an uncertain Stripe write is not blindly retried.
 
-## Prerequisites
+## Database schema and migration status
 
-- Node.js 22.23.4 (see `.node-version`).
-- npm 10 or newer.
-- Docker for the easiest local PostgreSQL setup, or another PostgreSQL instance.
-- Git.
+The intended schema is defined by ordered SQL migrations in `server/src/db/migrations/`:
 
-Swytchcode CLI and provider authentication are not required for Phase 0. Live Phase 2 GitHub ingestion requires a reviewed executor transport and an authorized GitHub connection; the current code safely remains disabled without them.
+| Migration                                 | Purpose                                         | Key objects                                                                                                                                      |
+| ----------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0000_phase0_baseline.sql`                | Connectivity baseline                           | phase-zero sentinel and migration ledger                                                                                                         |
+| `0001_phase1_foundation.sql`              | Identity and core workspace domain              | `app_user`, `session`, `workspace`, `membership`, `client`, `project`, `contract`, `time_entry`, `milestone`, `audit_event`, `source_connection` |
+| `0002_phase2_evidence_reconciliation.sql` | Evidence and reconciliation                     | `scope_rule`, `work_item`, `billing_run`, `run_source`, `run_item`, `provider_execution` and related constraints/policies                        |
+| `0003_commit_provenance.sql`              | Link normalized evidence to upstream records    | `work_item.related_external_id`, `work_item.repository_external_id`, index                                                                       |
+| `0004_phase3_invoice_approval.sql`        | Immutable invoice preview/review                | `invoice_preview`, `invoice_line`, `invoice_evidence_claim`, `invoice_review`, integrity constraints and policies                                |
+| `0005_vendorproof_app_rls.sql`            | Restricted application role and tenant policies | core identity/workspace RLS policies and grants; requires review and effective-role tests before use                                             |
 
-## Local development
+The principal relationships are: a workspace owns clients and projects; a project belongs to a client; contracts bind clients/projects to billing terms; time entries and milestones reference projects/contracts; source connections bind repositories to projects; work items and billing runs capture reconciliation evidence; invoice previews snapshot a billing run and its immutable invoice lines; evidence claims prevent reuse while a preview is open; review rows record approve/reject decisions; and audit events record consequential actions. UUID primary keys, workspace-scoped foreign keys, status checks, content hashes, and database constraints defend consistency. Money is stored as integer minor units with explicit currency codes.
+
+**Hosted databases do not yet match the latest migration chain.** As of 2026-11-07, the user-designated staging database and isolated test database both report only `0000`–`0002` in `public.__vendorproof_migrations`. The test database contains no app users or business rows; staging contains existing user/workspace/session data. Staging's Free plan has no scheduled backups. Do not run `npm run db:migrate` against either hosted database until a recoverable logical backup exists, the exposed database credentials have been rotated, the migration chain is reviewed, and the effective runtime role/policies are tested.
+
+## API design
+
+The versioned API is rooted at `/api/v1`. Successful responses use `{ "data": ... }`; errors use a stable code and sanitized message. JSON request bodies are validated at the boundary, workspace IDs are checked against authenticated membership, and mutation endpoints require CSRF/origin validation. The full route implementation is under `server/src/api/routes/`; `GET /health/live` and `GET /health/ready` are operational health endpoints, not business-readiness checks.
+
+| Area            | Route families                                                                                                  | Purpose                                                                                             |
+| --------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Authentication  | `/auth/register`, `/auth/login`, `/auth/logout`, `/auth/me`                                                     | Account registration, session lifecycle and current identity                                        |
+| Workspace       | `/workspaces`, `/workspaces/:workspaceId/members`                                                               | Create workspace and manage/view membership                                                         |
+| Core records    | `/workspaces/:workspaceId/{clients,projects,contracts,time-entries,milestones}`                                 | List/create records; generic record `PATCH`/`DELETE` routes and explicit status transitions         |
+| Audit           | `/workspaces/:workspaceId/audit-events`                                                                         | Bounded audit history                                                                               |
+| GitHub/evidence | `/workspaces/:workspaceId/projects/:projectId/sources`, `/runs`, reconciliation and decision routes             | Map a repository, connect/verify/disconnect, ingest bounded evidence, classify and review decisions |
+| Contracts       | `/workspaces/:workspaceId/projects/:projectId/contracts/:contractId/scope-rules`                                | Configure project/contract evidence scope                                                           |
+| Invoices        | `/workspaces/:workspaceId/invoice-eligible-runs`, `/invoice-previews` and `/invoice-previews/:invoiceId/review` | Preview eligible evidence and owner approve/reject with version/hash checks                         |
+
+Invoice API data comes from the Phase 3 migration and is therefore not functional against the current hosted schema until the migration gate is cleared. See `docs/api-inventory.md` for the canonical provider method register and verification levels; do not infer live provider availability from route presence or fake tests.
+
+## Repository layout
+
+- `apps/web/` — Next.js public site, fictional demo, authenticated workspace, management screens and browser API client.
+- `server/src/api/` — Fastify API and route modules.
+- `server/src/db/` — Postgres client, transaction context, migration runner and SQL migrations.
+- `server/src/swytchcode/` — official runtime executor and provider adapters.
+- `server/tests/` — unit tests, including fake-runtime provider safety tests.
+- `packages/shared/` — shared types/validation utilities.
+- `.swytchcode/` — provider Wrekenfiles and method allowlist; schemas are not proof of authentication or live execution.
+- `docs/` — deployment, threat model, API/provider inventory, phase notes, runbooks and roadmap.
+
+## Local setup
+
+Prerequisites: Node.js `22.23.4` (see `.node-version`), npm 10+, Git, and a local PostgreSQL 16+ instance. Docker Compose is provided for local development. No production credentials are required for unit tests or the fictional demo.
 
 ```bash
-cp .env.example .env
+git clone https://github.com/hitakshijoshi20072911/scppi.git
+cd scppi
+nvm use                 # or install the version in .node-version
 npm ci
+cp .env.example .env    # keep real values out of Git
 ```
 
-If Docker is available:
+Set `DATABASE_URL` in the ignored `.env` to a **local** PostgreSQL database before applying local migrations. Start the local database using `docker compose up -d postgres`, then run:
 
 ```bash
-docker compose up -d postgres
-# Set DATABASE_URL in the ignored .env file to your local database.
+set -a && . ./.env && set +a
 npm run db:migrate
 ```
 
-Start the services in separate terminals:
+Run the API and web app in separate terminals (the API defaults to port 3000; Next.js defaults to port 3000 too, so select a separate web port):
 
 ```bash
+# Terminal 1
+set -a && . ./.env && set +a
 npm run dev:api
-npm run dev:web
+
+# Terminal 2
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3000 npm run dev --workspace=@vendorproof/web -- --port 3001
 ```
 
-Open `http://localhost:3001`. Check `http://localhost:3000/health/live` and `http://localhost:3000/health/ready`.
+Set `API_CORS_ORIGIN=http://localhost:3001` in `.env`. Check API health at `http://localhost:3000/health/live` and `/health/ready`, and open the web app at `http://localhost:3001`. Keep `SWYTCHCODE_TOKEN` server-side; provider methods remain unavailable unless the official Swytchcode setup is completed. Never point local development at the user's hosted staging/production database.
 
-## Quality commands
+## Quality and release commands
 
 ```bash
 npm run format:check
@@ -82,29 +137,41 @@ npm run test:unit
 npm run test:e2e
 npm run build
 npm run db:check
-npm run db:migrate
 npm audit --omit=dev --audit-level=high
 ```
 
-The E2E test requires Playwright Chromium; install it with `npx playwright install chromium` if needed. `db:check` is a static Drizzle migration check; it does not test a live database. The Phase 0 migration creates a connectivity sentinel, not the product schema.
+`npm run db:check` checks migration metadata; it does not connect to a hosted database. `npm run db:migrate` applies pending migrations to the URL in `DATABASE_URL`; review its target before running. Playwright E2E tests require Chromium (`npx playwright install chromium`). Local adapter tests use fakes and must not be reported as external provider verification.
 
-See [`docs/phase0-validation.md`](docs/phase0-validation.md) for Phase 0 validation and [`docs/phase2-implementation.md`](docs/phase2-implementation.md) for Phase 2 scope, current checks, and live-verification blockers.
+## Hosting and operations
 
-## Deployment
+Existing hosting: Vercel project `vendorproof-web` serves `apps/web`; Render `vendorproof-api` hosts the Fastify API; Supabase `venderproof-staging` is the designated primary application database and `venderproof-test` is isolated. Render currently auto-deploys commits to `main`, with pull-request previews disabled. Vercel and Render project settings/secret values must be managed through the provider dashboards or authorized connectors; never copy database/API keys into `NEXT_PUBLIC_*` variables, Git, tickets, or chat.
 
-The planned deployment is Vercel for `apps/web`, Render for the Fastify API, and Supabase for PostgreSQL. No provider service has been created by this repository work. Follow [`docs/deployment.md`](docs/deployment.md), [`docs/production-setup.md`](docs/production-setup.md), [`docs/production.md`](docs/production.md), and [`docs/operations/runbook.md`](docs/operations/runbook.md).
+Deployment sequence: create and verify a protected logical backup; rotate any exposed credentials; apply reviewed migrations to the isolated test project; run migration/RLS/auth/CRUD integration tests as the restricted runtime role; repeat required recovery checks for staging; apply approved additive migrations; deploy the API/frontend with exact origins and separate preview/production configuration; then verify login, session persistence, workspace CRUD, tenant isolation, GitHub reads, Stripe test-mode draft safety, Calendar reminder ownership and health. A healthy `/health/ready` check proves only database connectivity. Rollback should prefer the last known-good application deployment and forward-only schema repair; never reset or delete a database to resolve a migration problem.
 
-For Vercel, set Root Directory to `apps/web` and configure `NEXT_PUBLIC_API_BASE_URL` separately for Preview and Production. For Render, use the reviewed `render.yaml`, set `API_CORS_ORIGIN` to the exact frontend origin, and store the Supabase `DATABASE_URL` as a secret. Do not put database, Swytchcode, Stripe, GitHub, or session credentials in frontend variables.
+Detailed operational guidance: [`docs/deployment.md`](docs/deployment.md), [`docs/production-setup.md`](docs/production-setup.md), [`docs/production.md`](docs/production.md), [`docs/operations/runbook.md`](docs/operations/runbook.md), and [`docs/threat-model.md`](docs/threat-model.md). The existing Supabase Free plan has no scheduled backups; do not upgrade it without explicit authorization. Use a secured logical dump as the no-upgrade recovery path.
 
-## Product and security rules
+## Provider and financial safety
 
-- GitHub activity is evidence of engineering activity, not proof of hours.
-- Hours come from human-entered and approved time records.
-- Fixed-price amounts come from explicit milestone records.
-- Money is calculated deterministically in integer minor units.
-- AI may suggest classifications or descriptions but cannot invent hours or money.
-- Human approval precedes financial actions.
-- Release-one financial scope is draft invoice creation only; no sending, finalization, charges, refunds, or payouts.
-- Tenant isolation and authorization are server responsibilities.
+| Provider                       | Intended use                                                                                 | Current evidence/state                                                                                                                                |
+| ------------------------------ | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub via Swytchcode          | Read bounded PR/commit metadata for mapped repositories                                      | Methods and fake-tested adapter exist; Swytchcode owner OAuth currently reports expired; no live verification                                         |
+| Stripe via Swytchcode          | Test-mode customer/invoice-item/draft creation after approval, with idempotency and recovery | Adapter and fake tests exist; separate Stripe connector reports a test account, but Swytchcode API-key connection and live test execution are pending |
+| Google Calendar via Swytchcode | Reminders only in a dedicated VendorProof-created calendar                                   | Adapter is limited to app-created calendar/events; Swytchcode OAuth connection and end-to-end execution are pending                                   |
 
-See [`rules.md`](rules.md), [`docs/threat-model.md`](docs/threat-model.md), and [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md).
+All provider payloads are untrusted. GitHub reads are bounded and must not ingest source code or diffs. Stripe must be confirmed test-mode before every write; the system does not send/finalize invoices or take payment. Calendar operations must never alter unrelated calendars/events. See [`docs/api-inventory.md`](docs/api-inventory.md) for method IDs, schemas, scopes and verification level. The earlier Swytchcode token and database URLs were exposed in chat and must be rotated before use.
+
+## Security and privacy
+
+- Session cookies are HTTP-only and secure in production; state-changing requests use CSRF protections and exact-origin validation.
+- Tenant isolation is enforced by server-side membership checks, transaction-local context and PostgreSQL RLS policies; the restricted runtime-role migration is not yet applied or integration-tested in hosted environments.
+- Provider tokens and database URLs are server-only secrets. Do not place them in frontend builds, logs, screenshots, test fixtures, or repository files.
+- Use only synthetic data for tests; minimize provider fields persisted to the application; retain audit records for human approval and consequential state changes.
+- Do not interpret engineering activity as hours, or use the software as a substitute for accounting, tax, legal, or professional advice.
+
+## Additional documentation
+
+- [`docs/phase0-validation.md`](docs/phase0-validation.md) — foundation validation.
+- [`docs/phase2-implementation.md`](docs/phase2-implementation.md) — evidence/reconciliation scope and blockers.
+- [`docs/phase3-implementation.md`](docs/phase3-implementation.md) — invoice-preview boundaries and limitations.
+- [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md) — delivery phases.
+- [`docs/friction-diary.md`](docs/friction-diary.md) — observed implementation/deployment friction, sanitized of credentials.

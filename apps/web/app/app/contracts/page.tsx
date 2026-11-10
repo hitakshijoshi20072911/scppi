@@ -123,9 +123,56 @@ export default function ContractsPage() {
                 <div className="record-actions">
                   <span className="record-status">{String(contract.status ?? 'draft')}</span>
                   {contract.status === 'draft' && (
-                    <button className="text-button" onClick={() => activate(String(contract.id))}>
-                      Activate
-                    </button>
+                    <>
+                      <button className="text-button" onClick={() => activate(String(contract.id))}>
+                        Activate
+                      </button>
+                      <button
+                        className="text-button"
+                        onClick={async () => {
+                          const title = window.prompt(
+                            'Contract title',
+                            String(contract.title ?? ''),
+                          )
+                          if (title === null || !title.trim() || !activeWorkspace) return
+                          try {
+                            await workspaceApi(activeWorkspace.id).updateContract(
+                              String(contract.id),
+                              { title },
+                            )
+                            load()
+                          } catch (cause) {
+                            setError(
+                              cause instanceof Error
+                                ? cause.message
+                                : 'Contract could not be updated.',
+                            )
+                          }
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="text-button"
+                        onClick={async () => {
+                          if (!window.confirm('Archive this contract?')) return
+                          try {
+                            await workspaceApi(activeWorkspace!.id).deleteContract(
+                              String(contract.id),
+                            )
+                            load()
+                          } catch (cause) {
+                            setError(
+                              cause instanceof Error
+                                ? cause.message
+                                : 'Contract could not be archived.',
+                            )
+                          }
+                        }}
+                      >
+                        Archive
+                      </button>
+                    </>
                   )}
                 </div>
               </div>

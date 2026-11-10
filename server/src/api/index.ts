@@ -13,6 +13,7 @@ import { phase3Routes } from './routes/phase3.js'
 import { productionExecutor, type SwytchcodeExecutor } from '../swytchcode/executor.js'
 
 export async function createServer(options: { phase2Executor?: SwytchcodeExecutor } = {}) {
+  const allowedOrigins = new Set([config.API_CORS_ORIGIN, ...config.API_CORS_ORIGINS])
   const server = Fastify({
     logger: false,
     trustProxy: true,
@@ -21,7 +22,7 @@ export async function createServer(options: { phase2Executor?: SwytchcodeExecuto
   })
 
   await server.register(helmet, { global: true })
-  await server.register(cors, { origin: config.API_CORS_ORIGIN, credentials: true })
+  await server.register(cors, { origin: [...allowedOrigins], credentials: true })
   server.get('/', async (_request, reply) =>
     reply.send({
       service: 'vendorproof-api',
@@ -38,7 +39,7 @@ export async function createServer(options: { phase2Executor?: SwytchcodeExecuto
   server.addHook('onRequest', async (request) => {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return
     const origin = request.headers.origin
-    if (origin && origin !== config.API_CORS_ORIGIN) {
+    if (origin && !allowedOrigins.has(origin)) {
       const error = new Error('Origin is not allowed')
       Object.assign(error, { statusCode: 403, code: 'FORBIDDEN_ORIGIN' })
       throw error
