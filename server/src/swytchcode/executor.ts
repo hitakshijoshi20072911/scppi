@@ -1,18 +1,14 @@
 import { createHash } from 'node:crypto'
 import { exec as swytchcodeExec } from '@swytchcode/runtime'
 import {
-  githubCommitGet2InputSchema,
   githubPullCommitsGetInputSchema,
-  githubPullGet1InputSchema,
   githubPullGetInputSchema,
 } from '../providers/github/schemas.js'
 import { config } from '../platform/config.js'
 
 export const VERIFIED_GITHUB_READ_METHOD_IDS = [
   'github.pull.get',
-  'github.pull.get1',
   'github.pull.commits.get',
-  'github.commit.get2',
 ] as const
 
 export type VerifiedGithubReadMethodId = (typeof VERIFIED_GITHUB_READ_METHOD_IDS)[number]
@@ -83,9 +79,7 @@ export class SwytchcodeExecutorError extends Error {
 
 const inputSchemas = {
   'github.pull.get': githubPullGetInputSchema,
-  'github.pull.get1': githubPullGet1InputSchema,
   'github.pull.commits.get': githubPullCommitsGetInputSchema,
-  'github.commit.get2': githubCommitGet2InputSchema,
 } as const
 
 const sensitiveKeyPattern = /(token|secret|password|authorization|api[_-]?key|credential)/i
