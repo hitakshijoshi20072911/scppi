@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createServer } from '../src/api/index.js'
-import { hashPassword, validatePassword, verifyPassword } from '../src/modules/core.js'
+import { can, hashPassword, validatePassword, verifyPassword } from '../src/modules/core.js'
 import { runtimeDatabaseUrl } from '../src/db/client.js'
 import { configSchema } from '../src/platform/config.js'
 
@@ -11,6 +11,13 @@ afterEach(async () => {
 })
 
 describe('Phase 1 security primitives', () => {
+  it('limits raw audit detail permission to owner and admin roles', () => {
+    expect(can('owner', 'approve')).toBe(true)
+    expect(can('admin', 'approve')).toBe(true)
+    expect(can('member', 'approve')).toBe(false)
+    expect(can('member', 'read')).toBe(true)
+  })
+
   it('normalizes a trailing slash from the configured CORS origin', () => {
     expect(configSchema.parse({ API_CORS_ORIGIN: 'https://example.com/' }).API_CORS_ORIGIN).toBe(
       'https://example.com',
@@ -54,6 +61,16 @@ describe('Phase 1 security primitives', () => {
     const response = await server.inject({
       method: 'GET',
       url: '/api/v1/workspaces/00000000-0000-0000-0000-000000000000/clients',
+    })
+    expect(response.statusCode).toBe(401)
+    expect(response.json()).toMatchObject({ code: 'UNAUTHENTICATED' })
+  })
+
+  it('rejects unauthenticated project activity reads before querying tenant events', async () => {
+    server = await createServer()
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/v1/workspaces/00000000-0000-0000-0000-000000000000/projects/11111111-1111-4111-8111-111111111111/activity',
     })
     expect(response.statusCode).toBe(401)
     expect(response.json()).toMatchObject({ code: 'UNAUTHENTICATED' })

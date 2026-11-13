@@ -6,6 +6,7 @@
     { "path": "/app", "title": "Overview | VendorProof" },
     { "path": "/app/clients", "title": "Clients | VendorProof" },
     { "path": "/app/projects", "title": "Projects | VendorProof" },
+    { "path": "/app/projects/:projectId", "title": "Project workspace | VendorProof" },
     { "path": "/app/evidence", "title": "Evidence & runs | VendorProof" },
     { "path": "/app/settings", "title": "Workspace settings | VendorProof" }
   ]

@@ -53,3 +53,14 @@ test('protected workspace routes redirect unauthenticated visitors to sign in', 
   await expect(page).toHaveURL(/\/login$/)
   await expect(page.getByRole('heading', { name: /Return to your workspace/i })).toBeVisible()
 })
+
+test('project workspace and reconciliation evidence stay behind workspace authentication', async ({
+  page,
+}) => {
+  await page.goto('/app/projects/11111111-1111-4111-8111-111111111111')
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByRole('heading', { name: /Return to your workspace/i })).toBeVisible()
+
+  await page.goto('/app/evidence')
+  await expect(page).toHaveURL(/\/login$/)
+})

@@ -15,7 +15,7 @@ This register distinguishes source code and mocks from real provider authenticat
 
 Do not claim a provider at a higher level than evidenced. Unit tests use fakes and do not count as rung 8.
 
-## Current provider matrix (2026-11-10)
+## Current provider matrix (2026-11-13)
 
 | Provider        | Purpose                                                                           | Selected canonical methods                   | Highest evidenced level | Live status                                                                                                  |
 | --------------- | --------------------------------------------------------------------------------- | -------------------------------------------- | ----------------------: | ------------------------------------------------------------------------------------------------------------ |
@@ -24,6 +24,8 @@ Do not claim a provider at a higher level than evidenced. Unit tests use fakes a
 | Google Calendar | Source-only reminder adapter pending durable ownership provenance                 | None enabled                                 |                       5 | All Calendar methods disabled; label matching alone does not prove app ownership; OAuth/live test pending    |
 
 No provider has reached rung 7 or 8 in this task. The separate Stripe connector can identify a test-mode account, but that is not Swytchcode authentication and is not used to make provider calls. User-provided Swytchcode token and database URLs were exposed in chat and must be rotated before reuse.
+
+The authenticated integration screen allows project-scoped GitHub repository mapping and shows the actual connection status returned by the API. Stripe and Google Calendar are visibly marked unavailable/not verified with disabled actions; those controls are not an OAuth connection flow and must not be described as working until the server-side provider paths and safety gates are completed. The project workspace/evidence UI is backed by application APIs and does not change any provider verification level.
 
 ## GitHub
 
