@@ -36,6 +36,7 @@ export const configSchema = z.object({
       'Additional API CORS origins must be exact origins without paths or wildcards',
     ),
   DATABASE_URL: z.string().url().optional(),
+  APP_DATABASE_URL: z.string().url().optional(),
   SWYTCHCODE_TOKEN: z.string().min(1).optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 })
@@ -50,6 +51,7 @@ function loadConfig(): Config {
     API_CORS_ORIGIN: process.env.API_CORS_ORIGIN,
     API_CORS_ORIGINS: process.env.API_CORS_ORIGINS,
     DATABASE_URL: process.env.DATABASE_URL,
+    APP_DATABASE_URL: process.env.APP_DATABASE_URL,
     SWYTCHCODE_TOKEN: process.env.SWYTCHCODE_TOKEN,
     LOG_LEVEL: process.env.LOG_LEVEL,
   })

@@ -77,10 +77,20 @@ export default function ProjectsPage() {
             {projects.map((project) => (
               <div className="record-row" key={String(project.id)}>
                 <div>
-                  <strong>{String(project.name ?? 'Unnamed project')}</strong>
+                  <strong>
+                    <Link href={`/app/projects/${encodeURIComponent(String(project.id))}`}>
+                      {String(project.name ?? 'Unnamed project')}
+                    </Link>
+                  </strong>
                   <small>{String(project.description ?? 'No description')}</small>
                 </div>
                 <div className="record-actions">
+                  <Link
+                    className="text-link"
+                    href={`/app/projects/${encodeURIComponent(String(project.id))}`}
+                  >
+                    Open workspace →
+                  </Link>
                   <span className="record-status">{String(project.status ?? 'active')}</span>
                   {project.status !== 'archived' && (
                     <>

@@ -3034,3 +3034,216 @@ html.vp-booting {
     white-space: nowrap;
   }
 }
+
+/* Project workspace: scoped records, reconciliation runs and safe audit metadata. */
+.project-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.project-breadcrumb a,
+.project-stat-grid a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.project-breadcrumb a:hover,
+.project-stat-grid a:hover {
+  text-decoration: underline;
+}
+.project-detail-heading {
+  align-items: center;
+}
+.project-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin: 1.5rem 0;
+}
+.project-stat-grid article {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.project-stat-grid article > span,
+.project-stat-grid a {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.project-stat-grid strong {
+  font-size: 1.8rem;
+  letter-spacing: -0.06em;
+}
+.project-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.8fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.project-record-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.project-record-columns h3,
+.run-evidence-list h3 {
+  margin: 1rem 0 0.65rem;
+  font-size: 0.9rem;
+}
+.project-mini-row {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.project-mini-row strong {
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+.project-mini-row span {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+.project-runs-panel,
+.project-activity-panel {
+  margin-top: 1rem;
+}
+.run-evidence-list {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.46);
+}
+.project-timeline {
+  display: grid;
+  gap: 0;
+  margin-top: 1rem;
+}
+.project-timeline article {
+  position: relative;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0 0 1rem;
+}
+.project-timeline article:not(:last-child)::after {
+  position: absolute;
+  top: 12px;
+  bottom: 0;
+  left: 5px;
+  width: 1px;
+  background: var(--line);
+  content: '';
+}
+.timeline-dot {
+  z-index: 1;
+  width: 11px;
+  height: 11px;
+  margin-top: 3px;
+  border: 2px solid var(--emerald);
+  border-radius: 50%;
+  background: var(--paper);
+}
+.project-timeline strong,
+.project-timeline small {
+  display: block;
+}
+.project-timeline strong {
+  font-size: 0.78rem;
+  text-transform: capitalize;
+}
+.project-timeline small,
+.project-audit-note {
+  margin-top: 0.3rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+.project-audit-note {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+.integration-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.integration-grid > article:first-child {
+  grid-column: 1 / -1;
+}
+.provider-setup-note {
+  display: block;
+  margin-top: 0.75rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+@media (max-width: 900px) {
+  .project-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .integration-grid {
+    grid-template-columns: 1fr;
+  }
+  .integration-grid > article:first-child {
+    grid-column: auto;
+  }
+}
+@media (max-width: 640px) {
+  .project-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .project-record-columns {
+    grid-template-columns: 1fr;
+  }
+  .project-detail-heading {
+    align-items: flex-start;
+  }
+}
+
+.evidence-create-panel,
+.evidence-project-panel,
+.evidence-items-panel {
+  margin-top: 1rem;
+}
+.evidence-run-form label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.evidence-run-form input,
+.evidence-run-form select {
+  min-width: 0;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+}
+.evidence-project-panel h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+.evidence-project-panel h2 a:hover {
+  text-decoration: underline;
+}
+.evidence-items-panel .record-row a {
+  display: inline-block;
+  margin-top: 0.35rem;
+  color: var(--emerald);
+  font-size: 0.7rem;
+}
+@media (max-width: 900px) {
+  .evidence-run-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .evidence-run-form {
+    grid-template-columns: 1fr;
+  }
+}

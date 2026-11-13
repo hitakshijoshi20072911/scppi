@@ -738,7 +738,7 @@ export async function phase1Routes(app: FastifyInstance) {
 
   app.get('/api/v1/workspaces/:workspaceId/audit-events', async (request, reply) => {
     const { workspaceId } = parse(workspaceParams, request.params)
-    const { auth } = await requireRole(request, workspaceId, 'read')
+    const { auth } = await requireRole(request, workspaceId, 'approve')
     return ok(
       reply,
       await withDbContext(
@@ -747,6 +747,37 @@ export async function phase1Routes(app: FastifyInstance) {
           tx`select id, actor_user_id, action, entity_type, entity_id, before_data, after_data, request_id, created_at from audit_event where workspace_id = ${workspaceId} order by created_at desc limit 100`,
       ),
     )
+  })
+  app.get('/api/v1/workspaces/:workspaceId/projects/:id/activity', async (request, reply) => {
+    const { workspaceId, id: projectId } = parse(resourceParams, request.params)
+    const { auth } = await requireRole(request, workspaceId, 'read')
+    const result = await withDbContext({ userId: auth.userId, workspaceId }, async (tx) => {
+      const [project] =
+        await tx`select id from project where workspace_id = ${workspaceId} and id = ${projectId}`
+      if (!project)
+        throw Object.assign(new Error('Project not found'), { statusCode: 404, code: 'NOT_FOUND' })
+      const events = await tx`
+        select id, action, entity_type, entity_id, created_at
+        from audit_event
+        where workspace_id = ${workspaceId}
+          and (
+            (entity_type = 'project' and entity_id = ${projectId})
+            or (entity_type = 'contract' and entity_id in (select id from contract where workspace_id = ${workspaceId} and project_id = ${projectId}))
+            or (entity_type = 'time_entry' and entity_id in (select id from time_entry where workspace_id = ${workspaceId} and project_id = ${projectId}))
+            or (entity_type = 'milestone' and entity_id in (select id from milestone where workspace_id = ${workspaceId} and project_id = ${projectId}))
+            or (entity_type = 'source_connection' and entity_id in (select id from source_connection where workspace_id = ${workspaceId} and project_id = ${projectId}))
+            or (entity_type = 'billing_run' and entity_id in (select id from billing_run where workspace_id = ${workspaceId} and project_id = ${projectId}))
+            or (entity_type = 'run_item' and entity_id in (
+              select ri.id from run_item ri join billing_run br on br.workspace_id = ri.workspace_id and br.id = ri.run_id
+              where ri.workspace_id = ${workspaceId} and br.project_id = ${projectId}
+            ))
+          )
+        order by created_at desc
+        limit 100
+      `
+      return events
+    })
+    return ok(reply, result)
   })
 }
 

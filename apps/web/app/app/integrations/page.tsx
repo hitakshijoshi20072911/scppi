@@ -27,6 +27,9 @@ export default function IntegrationsPage() {
       .projects()
       .then(async (rows) => {
         setProjects(rows)
+        const requestedProject = new URLSearchParams(window.location.search).get('projectId')
+        if (requestedProject && rows.some((project) => String(project.id) === requestedProject))
+          setProjectId(requestedProject)
         const all = await Promise.all(rows.map((project) => api.sources(String(project.id))))
         setSources(
           all.flatMap((projectSources, index) =>
@@ -235,16 +238,45 @@ export default function IntegrationsPage() {
           </form>
         </article>
         <article className="panel panel-quiet">
-          <p className="eyebrow">Stripe / draft invoices</p>
-          <h2>Not connected.</h2>
+          <p className="eyebrow">Stripe / test-mode drafts</p>
+          <h2>Setup required.</h2>
           <p className="panel-copy">
-            Stripe methods are schema-verified but owner authentication and sandbox execution are
-            still pending. No invoice screen or connection-success state is shown here.
+            VendorProof will only create an approved test-mode draft. The Swytchcode Stripe methods
+            and API route are deliberately disabled until a test credential is verified and
+            idempotent recovery is implemented.
           </p>
-          <span className="status-badge">Not configured</span>
+          <span className="status-badge">Not connected · not verified</span>
           <p className="coming-soon">
-            Connection controls will appear after the verified backend integration is available.
+            No live or financial action is available from this workspace.
           </p>
+          <button className="button button-ghost" disabled aria-describedby="stripe-setup-note">
+            Connect Stripe test account
+          </button>
+          <small id="stripe-setup-note" className="provider-setup-note">
+            Connect remains unavailable until server-side test-mode verification and a safe
+            draft-only API path are complete.
+          </small>
+        </article>
+        <article className="panel panel-quiet">
+          <p className="eyebrow">Google Calendar / reminders</p>
+          <h2>Setup required.</h2>
+          <p className="panel-copy">
+            Calendar reminders will be restricted to a VendorProof-created calendar. The provider
+            methods remain disabled until trusted calendar ownership is stored and live OAuth is
+            verified.
+          </p>
+          <span className="status-badge">Not connected · not verified</span>
+          <p className="coming-soon">
+            Planned least-privilege access: read calendar list and manage only app-created
+            calendars/events.
+          </p>
+          <button className="button button-ghost" disabled aria-describedby="calendar-setup-note">
+            Connect Google Calendar
+          </button>
+          <small id="calendar-setup-note" className="provider-setup-note">
+            No Gmail, Drive or Contacts access is requested. Connection is unavailable until backend
+            ownership safeguards are implemented.
+          </small>
         </article>
       </section>
     </>

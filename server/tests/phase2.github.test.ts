@@ -56,16 +56,9 @@ describe('Swytchcode provider tenant lifecycle', () => {
 })
 
 function validInput(methodId: (typeof VERIFIED_GITHUB_READ_METHOD_IDS)[number]) {
-  switch (methodId) {
-    case 'github.pull.get':
-      return { owner: 'octocat', repo: 'Hello-World', per_page: 5, page: 1 }
-    case 'github.pull.get1':
-      return { owner: 'octocat', repo: 'Hello-World', pull_number: 1 }
-    case 'github.pull.commits.get':
-      return { owner: 'octocat', repo: 'Hello-World', pull_number: 1, per_page: 5, page: 1 }
-    case 'github.commit.get2':
-      return { owner: 'octocat', repo: 'Hello-World', ref: 'main', page: 1, per_page: 5 }
-  }
+  if (methodId === 'github.pull.get')
+    return { owner: 'octocat', repo: 'Hello-World', per_page: 5, page: 1 }
+  return { owner: 'octocat', repo: 'Hello-World', pull_number: 1, per_page: 5, page: 1 }
 }
 
 function pullRequest(overrides: Record<string, unknown> = {}) {
@@ -95,7 +88,7 @@ function transportMock(
 }
 
 describe('guarded Swytchcode executor', () => {
-  it('permits exactly the four verified read IDs and passes authenticated workspace separately', async () => {
+  it('permits exactly the two adapter-used read IDs and passes authenticated workspace separately', async () => {
     const { transport, execute } = transportMock()
     const executor = createSwytchcodeExecutor(transport)
 
@@ -103,7 +96,7 @@ describe('guarded Swytchcode executor', () => {
       await executor.execute({ methodId, input: validInput(methodId), identity })
     }
 
-    expect(execute).toHaveBeenCalledTimes(4)
+    expect(execute).toHaveBeenCalledTimes(2)
     for (const [index, methodId] of VERIFIED_GITHUB_READ_METHOD_IDS.entries()) {
       const call = execute.mock.calls[index]?.[0]
       expect(call?.methodId).toBe(methodId)
@@ -121,6 +114,13 @@ describe('guarded Swytchcode executor', () => {
       executor.execute({
         methodId: 'github.pull.create' as never,
         input: { owner: 'octocat', repo: 'Hello-World' },
+        identity,
+      }),
+    ).rejects.toMatchObject({ code: 'UNSUPPORTED_METHOD' })
+    await expect(
+      executor.execute({
+        methodId: 'github.commit.get2' as never,
+        input: { owner: 'octocat', repo: 'Hello-World', ref: 'main' },
         identity,
       }),
     ).rejects.toMatchObject({ code: 'UNSUPPORTED_METHOD' })

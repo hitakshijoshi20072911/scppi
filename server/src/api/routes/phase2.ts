@@ -440,6 +440,18 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
     return ok(reply, result, 201)
   })
 
+  app.get('/api/v1/workspaces/:workspaceId/projects/:projectId/runs', async (request, reply) => {
+    const { workspaceId, projectId } = parse(paramsSchema, request.params)
+    await requireContext(request, workspaceId, 'read')
+    const runs = await withWorkspace(request, workspaceId, async (tx) => {
+      const [project] =
+        await tx`select id from project where workspace_id = ${workspaceId} and id = ${projectId}`
+      if (!project) fail(404, 'NOT_FOUND', 'Project not found')
+      return tx`select id, project_id, contract_id, period_start, period_end, time_zone, status, completeness, version, outstanding_decisions, accepted_partial_at, created_at, updated_at from billing_run where workspace_id = ${workspaceId} and project_id = ${projectId} order by created_at desc limit 100`
+    })
+    return ok(reply, runs)
+  })
+
   app.get(
     '/api/v1/workspaces/:workspaceId/projects/:projectId/runs/:runId',
     async (request, reply) => {

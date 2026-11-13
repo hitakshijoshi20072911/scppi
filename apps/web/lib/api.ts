@@ -230,6 +230,8 @@ export function workspaceApi(workspaceId: string) {
         { method: 'POST', retry: false },
       ),
     runs: {
+      list: (projectId: string) =>
+        apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/runs`),
       create: (projectId: string, body: { periodStart: string; periodEnd: string }) =>
         apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/runs`, {
           method: 'POST',
@@ -249,7 +251,34 @@ export function workspaceApi(workspaceId: string) {
           `/api/v1/workspaces/${workspaceId}/projects/${projectId}/runs/${runId}/start`,
           { method: 'POST', body: { runVersion }, retry: false },
         ),
+      classify: (projectId: string, runId: string, runVersion: number) =>
+        apiRequest<RecordRow>(
+          `/api/v1/workspaces/${workspaceId}/projects/${projectId}/runs/${runId}/classify`,
+          { method: 'POST', body: { runVersion }, retry: false },
+        ),
+      acceptPartial: (projectId: string, runId: string, runVersion: number) =>
+        apiRequest<RecordRow>(
+          `/api/v1/workspaces/${workspaceId}/projects/${projectId}/runs/${runId}/accept-partial`,
+          { method: 'POST', body: { runVersion }, retry: false },
+        ),
+      decide: (
+        projectId: string,
+        runId: string,
+        itemId: string,
+        body: {
+          runVersion: number
+          decision: 'approve' | 'reject'
+          category?: string
+          clientDescription?: string
+        },
+      ) =>
+        apiRequest<RecordRow>(
+          `/api/v1/workspaces/${workspaceId}/projects/${projectId}/runs/${runId}/items/${itemId}/decision`,
+          { method: 'POST', body, retry: false },
+        ),
     },
+    projectActivity: (projectId: string) =>
+      apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/activity`),
   }
 }
 
