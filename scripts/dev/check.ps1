@@ -51,21 +51,15 @@ $env:APP_DATABASE_URL = 'postgresql://vendorproof_app:vendorproof_app@127.0.0.1:
 $env:NODE_ENV = 'test'
 
 function Assert-HttpStatus {
-  param([string]$Url, [int]$ExpectedStatus)
+  param([string]$Url, [int]$ExpectedStatus, [string]$StartupHint)
   try {
     $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 10
     if ([int]$response.StatusCode -ne $ExpectedStatus) { throw "returned HTTP $($response.StatusCode)" }
   } catch {
     if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq $ExpectedStatus) { return }
-    throw "Expected HTTP $ExpectedStatus from $Url, but the request failed: $($_.Exception.Message)"
+    throw "$StartupHint Expected HTTP $ExpectedStatus from $Url, but the request failed: $($_.Exception.Message)"
   }
 }
-
-Assert-HttpStatus 'http://127.0.0.1:3000/health/live' 200
-Assert-HttpStatus 'http://127.0.0.1:3000/health/ready' 200
-Assert-HttpStatus 'http://localhost:3001/' 200
-Assert-HttpStatus 'http://localhost:3001/api/v1/auth/me' 401
-Write-Host 'API and frontend endpoints: reachable; proxy returns expected unauthenticated status'
 
 npm run db:check
 npm run format:check
@@ -75,4 +69,11 @@ npm run test:unit
 npm run test:integration
 npm run build
 if ($LASTEXITCODE -ne 0) { throw 'A repository quality gate failed.' }
+
+Write-Host 'Repository and database checks passed. Verifying separately started API and frontend services...'
+Assert-HttpStatus 'http://localhost:3000/health/live' 200 'API is not running. Start npm run dev:api in another terminal and rerun this check.'
+Assert-HttpStatus 'http://localhost:3000/health/ready' 200 'API is not running. Start npm run dev:api in another terminal and rerun this check.'
+Assert-HttpStatus 'http://localhost:3001/' 200 'Frontend is not running. Start npm run dev:web in another terminal and rerun this check.'
+Assert-HttpStatus 'http://localhost:3001/api/v1/auth/me' 401 'Frontend is not running. Start npm run dev:web in another terminal and rerun this check.'
+Write-Host 'API and frontend endpoints: reachable; proxy returns expected unauthenticated status'
 Write-Host 'VendorProof local checks completed.'

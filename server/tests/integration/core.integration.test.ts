@@ -1,11 +1,18 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { randomUUID } from 'node:crypto'
 import { closeDatabase, getDatabase } from '../../src/db/client.js'
 import { createServer } from '../../src/api/index.js'
 import { withDbContext } from '../../src/modules/core.js'
 
 type Envelope<T> = { data: T }
 type Row = { id: string; [key: string]: unknown }
-type Session = { cookie: string; csrf: string; workspaceId: string; userId: string }
+type Session = {
+  cookie: string
+  csrf: string
+  workspaceId: string
+  workspaceSlug: string
+  userId: string
+}
 
 const enabled = Boolean(process.env.APP_DATABASE_URL || process.env.DATABASE_URL)
 describe.skipIf(!enabled)('PostgreSQL core integration', () => {
@@ -34,6 +41,7 @@ describe.skipIf(!enabled)('PostgreSQL core integration', () => {
       cookie: cookieFrom(response),
       csrf: body.data.csrfToken,
       workspaceId: String(body.data.workspace.id),
+      workspaceSlug: String(body.data.workspace.slug),
       userId: String(body.data.user.id),
     }
   }
@@ -71,7 +79,7 @@ describe.skipIf(!enabled)('PostgreSQL core integration', () => {
   })
 
   it('persists a session and supports core records through approval', async () => {
-    const session = await register(`owner-${Date.now()}@example.test`, 'Integration workspace')
+    const session = await register(`owner-${randomUUID()}@example.test`, 'Integration workspace')
     const me = await server.inject({
       method: 'GET',
       url: '/api/v1/auth/me',
@@ -229,8 +237,9 @@ describe.skipIf(!enabled)('PostgreSQL core integration', () => {
   })
 
   it('accepts a fixed-price milestone and isolates workspaces under RLS', async () => {
-    const first = await register(`first-${Date.now()}@example.test`, 'First workspace')
-    const second = await register(`second-${Date.now()}@example.test`, 'Second workspace')
+    const first = await register(`first-${randomUUID()}@example.test`, 'First workspace')
+    const second = await register(`second-${randomUUID()}@example.test`, 'Second workspace')
+    expect(first.workspaceSlug).not.toBe(second.workspaceSlug)
 
     const client = await server.inject({
       method: 'POST',

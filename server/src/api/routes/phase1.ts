@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { getDatabase } from '../../db/client.js'
+import { logger } from '../../platform/logger.js'
 import {
   audit,
   authenticate,
@@ -159,9 +160,9 @@ export async function phase1Routes(app: FastifyInstance) {
           await tx`insert into app_user (email, name, password_hash) values (${email}, ${input.name}, ${await hashPassword(input.password)}) returning id, email, name, status, created_at`
         await setDbContext(tx, { userId: String(user.id) })
         const name = input.workspaceName ?? `${input.name}'s workspace`
-        let slug = slugify(name) || `workspace-${user.id.slice(0, 8)}`
-        const [existing] = await tx`select id from workspace where slug = ${slug}`
-        if (existing) slug = `${slug}-${user.id.slice(0, 8)}`
+        const baseSlug = slugify(name) || 'workspace'
+        const suffix = user.id.slice(0, 8)
+        const slug = `${baseSlug.slice(0, 80 - suffix.length - 1)}-${suffix}`
         const [workspace] =
           await tx`insert into workspace (name, slug, owner_id) values (${name}, ${slug}, ${user.id}) returning id, name, slug, status`
         await setDbContext(tx, { userId: String(user.id), workspaceId: String(workspace.id) })
@@ -186,11 +187,18 @@ export async function phase1Routes(app: FastifyInstance) {
         201,
       )
     } catch (error) {
-      if ((error as { code?: string }).code === '23505')
+      const databaseError = error as { code?: string; constraint?: string }
+      if (databaseError.code === '23505' && databaseError.constraint === 'app_user_email_key')
         throw Object.assign(new Error('An account with that email already exists'), {
           statusCode: 409,
           code: 'DUPLICATE_EMAIL',
         })
+      if (databaseError.code === '23505') {
+        logger.warn(
+          { constraint: databaseError.constraint ?? 'unknown', requestId: request.id },
+          'Registration rejected by a unique constraint',
+        )
+      }
       throw error
     }
   })

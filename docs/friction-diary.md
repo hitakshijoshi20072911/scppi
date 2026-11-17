@@ -133,6 +133,15 @@ The GSAP warnings had two confirmed source patterns in `landing-experience.tsx`:
 - **Regression coverage:** the integration suite now checks submission metadata, duplicate submission rejection, draft approval rejection, rejected-entry resubmission, wrong-workspace non-modification, and sanitized response diagnostics containing only status, code, message, and request ID.
 - **Verification boundary:** formatting, lint, typecheck, 81 unit tests, and production builds pass. This sandbox has no Docker/PostgreSQL, so the corrected database-backed integration suite has not been claimed as passing here; the user must rerun it locally with `APP_DATABASE_URL` using `vendorproof_app`.
 
+## Final Prompt 1 local registration/check workflow — 2026-11-18
+
+- **Actual Windows result:** the user's repeated local integration run reached registration and returned `expected 201, received 409`; the attached report did not include the PostgreSQL constraint name or a sanitized response/request ID. The prior implementation translated every `23505` into `DUPLICATE_EMAIL`, so the real unique violation was hidden from the user.
+- **Confirmed design flaw:** workspace slugs were globally unique, but registration first performed an RLS-scoped existence query. A newly registered user could not see a same-slug workspace owned by another tenant, so the lookup could not protect the global constraint.
+- **Fix:** registration now derives a readable slug from the workspace name plus the new user's UUID prefix, truncated to the 80-character database limit. Only `app_user_email_key` maps to `DUPLICATE_EMAIL`; other unique violations retain their real error path while logging only the safe constraint name and request ID.
+- **Test improvements:** integration emails use `randomUUID()`, workspace slugs are asserted unique, and the existing RLS/time-entry transition coverage remains in place so the suite can be run repeatedly against the same database without cleanup.
+- **Formatting/check workflow:** the five reported CSS files were run through Prettier and were unchanged in this checkout; `format:check` passes. `check.ps1` now runs database/repository checks and integration tests before HTTP health checks, and reports an actionable API-start message when port 3000 is not listening. The API remains on port 3000, frontend on 3001, and fresh `apps/web/.env.local` uses `http://localhost:3000`.
+- **Verification boundary:** this sandbox passes the non-database checks but has no Docker/PostgreSQL. The actual violated constraint name and consecutive database-backed integration results must be confirmed on the user's Windows database run; they are not fabricated here.
+
 ## Windows migration path correction — 2026-11-17
 
 - **Reproduction:** after Node `v22.23.4`, Docker Desktop, PostgreSQL readiness on `127.0.0.1:5433`, and `npm ci` succeeded, the Windows migration command failed with `ENOENT: no such file or directory, scandir 'C:\C:\swytchcode\server\src\db\migrations'`.

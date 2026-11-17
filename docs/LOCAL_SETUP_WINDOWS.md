@@ -34,7 +34,7 @@ npm run dev:api
 npm run dev:web
 ```
 
-The API is at `http://127.0.0.1:3000`; the web app is at `http://localhost:3001`. `setup.ps1` creates `apps/web/.env.local` with `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:3000`, so browser requests use the Next.js same-origin `/api` rewrite to the local API. Environment changes require restarting the Next.js dev server. The local session cookie is intentionally named `vendorproof_session` because the `__Host-` prefix requires `Secure`, which is not appropriate for plain HTTP local development. Staging and production use `__Host-vendorproof_session; Secure; Path=/; HttpOnly` and do not weaken that policy.
+The API is at `http://localhost:3000`; the web app is at `http://localhost:3001`. `setup.ps1` creates `apps/web/.env.local` with `NEXT_PUBLIC_API_BASE_URL=http://localhost:3000`, so browser requests use the Next.js same-origin `/api` rewrite to the local API. Environment changes require restarting the Next.js dev server. The local session cookie is intentionally named `vendorproof_session` because the `__Host-` prefix requires `Secure`, which is not appropriate for plain HTTP local development. Staging and production use `__Host-vendorproof_session; Secure; Path=/; HttpOnly` and do not weaken that policy.
 
 Check API liveness and readiness:
 
@@ -52,6 +52,8 @@ The last request is expected to return HTTP `401` from Fastify through the Next.
 ```powershell
 .\scripts\dev\check.ps1
 ```
+
+The check script validates Compose, PostgreSQL, migrations, repository quality, and database-backed integration tests before checking HTTP services. It does not require the API or frontend for the database tests, but it does require both services for the final health/proxy checks. If the API is not running, it reports: `API is not running. Start npm run dev:api in another terminal and rerun this check.`
 
 For PostgreSQL-backed integration tests against the local `vendorproof` database, the setup script applies migrations with the migration-owner URL and provisions the local-only password for the restricted role. Run the tests with the restricted runtime URL:
 

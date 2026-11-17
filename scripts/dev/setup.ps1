@@ -81,7 +81,7 @@ Set-EnvDefault '.env' @{
 
 $webEnv = Join-Path $repoRoot 'apps/web/.env.local'
 if (-not (Test-Path $webEnv)) { New-Item -ItemType File -Path $webEnv -Force | Out-Null }
-Set-EnvDefault $webEnv @{ NEXT_PUBLIC_API_BASE_URL = 'http://127.0.0.1:3000' }
+Set-EnvDefault $webEnv @{ NEXT_PUBLIC_API_BASE_URL = 'http://localhost:3000' }
 
 if (-not $SkipInstall) {
   Write-Host 'Installing locked dependencies...'
