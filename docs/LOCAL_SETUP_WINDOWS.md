@@ -8,10 +8,11 @@ This is the supported local path for Windows PowerShell, Windsurf, Node.js `22.2
 git clone https://github.com/hitakshijoshi20072911/scppi.git
 cd scppi
 git checkout feat/vendorproof-local-and-core-repair
-nvm use 22.23.4
 Set-ExecutionPolicy -Scope Process Bypass
 .\scripts\dev\setup.ps1
 ```
+
+The scripts do not require nvm. If Node is missing or reports `v22.19.0` (or any version below `22.23.4`), install the official Windows x64 MSI for Node `22.23.4`: <https://nodejs.org/dist/v22.23.4/node-v22.23.4-x64.msi>. Close and reopen PowerShell afterward. Setup prints both `node --version` and `npm --version` and stops before running npm when the Node version is incompatible.
 
 `setup.ps1` is idempotent. It copies `.env.example` only when `.env` does not exist, adds missing safe defaults without overwriting existing values, starts only the `postgres` service, waits for readiness, and runs the tracked migration chain. It does not print secret values. To install dependencies separately, use `.\scripts\dev\setup.ps1 -SkipInstall` after `npm ci`.
 
@@ -33,14 +34,18 @@ npm run dev:api
 npm run dev:web
 ```
 
-The API is at `http://localhost:3000`; the web app is at `http://localhost:3001`. `setup.ps1` creates `apps/web/.env.local` with `NEXT_PUBLIC_API_BASE_URL=http://localhost:3000`, so browser requests use the Next.js same-origin `/api` rewrite to the local API. The local session cookie is intentionally named `vendorproof_session` because the `__Host-` prefix requires `Secure`, which is not appropriate for plain HTTP local development. Staging and production use `__Host-vendorproof_session; Secure; Path=/; HttpOnly` and do not weaken that policy.
+The API is at `http://127.0.0.1:3000`; the web app is at `http://localhost:3001`. `setup.ps1` creates `apps/web/.env.local` with `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:3000`, so browser requests use the Next.js same-origin `/api` rewrite to the local API. Environment changes require restarting the Next.js dev server. The local session cookie is intentionally named `vendorproof_session` because the `__Host-` prefix requires `Secure`, which is not appropriate for plain HTTP local development. Staging and production use `__Host-vendorproof_session; Secure; Path=/; HttpOnly` and do not weaken that policy.
 
 Check API liveness and readiness:
 
 ```powershell
 Invoke-WebRequest http://localhost:3000/health/live
 Invoke-WebRequest http://localhost:3000/health/ready
+Invoke-WebRequest http://localhost:3001/
+Invoke-WebRequest http://localhost:3001/api/v1/auth/me
 ```
+
+The last request is expected to return HTTP `401` from Fastify through the Next.js proxy, not a Next.js `404`.
 
 ## Verify the checkout
 
@@ -48,12 +53,11 @@ Invoke-WebRequest http://localhost:3000/health/ready
 .\scripts\dev\check.ps1
 ```
 
-For PostgreSQL-backed integration tests against a disposable database, apply migrations with the migration-owner URL and run the API tests with the restricted runtime URL:
+For PostgreSQL-backed integration tests against the local `vendorproof` database, the setup script applies migrations with the migration-owner URL and provisions the local-only password for the restricted role. Run the tests with the restricted runtime URL:
 
 ```powershell
-$env:DATABASE_URL = 'postgresql://migration_user:<password>@127.0.0.1:5433/vendorproof_integration'
-npm run db:migrate
-$env:APP_DATABASE_URL = 'postgresql://vendorproof_app:<password>@127.0.0.1:5433/vendorproof_integration'
+$env:DATABASE_URL = 'postgresql://vendorproof:vendorproof@127.0.0.1:5433/vendorproof'
+$env:APP_DATABASE_URL = 'postgresql://vendorproof_app:vendorproof_app@127.0.0.1:5433/vendorproof'
 $env:NODE_ENV = 'test'
 npm run test:integration
 ```
@@ -66,4 +70,4 @@ The integration suite creates synthetic records only. It verifies registration/s
 docker compose stop postgres
 ```
 
-Do not use `docker compose down -v` for routine cleanup; that deletes the VendorProof volume. If a disposable integration database is needed, create a separate database or disposable Compose project rather than resetting an existing database.
+Do not use `docker compose down -v` for routine cleanup; that deletes the VendorProof volume. The normal local setup uses the persistent `vendorproof` database; do not point tests at `vendorproof_integration` unless you explicitly create that database in a separate disposable Compose project.

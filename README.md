@@ -97,12 +97,11 @@ Invoice API data comes from the Phase 3 migration and is therefore not functiona
 
 ## Local setup
 
-Prerequisites: Node.js `22.23.4` (see `.node-version`), npm 10+, Git, and a local PostgreSQL 16+ instance. Docker Compose is provided for local development. No production credentials are required for unit tests or the fictional demo.
+Prerequisites: Node.js `22.23.4` (see `.node-version`), npm 10+, Git, and a local PostgreSQL 16+ instance. Docker Compose is provided for local development. On Windows, install Node with the official [22.23.4 x64 MSI](https://nodejs.org/dist/v22.23.4/node-v22.23.4-x64.msi); the setup scripts do not require nvm and stop before npm commands when Node is incompatible. No production credentials are required for unit tests or the fictional demo.
 
 ```bash
 git clone https://github.com/hitakshijoshi20072911/scppi.git
 cd scppi
-nvm use                 # or install the version in .node-version
 npm ci
 cp .env.example .env    # keep real values out of Git
 ```
@@ -114,7 +113,7 @@ set -a && . ./.env && set +a
 npm run db:migrate
 ```
 
-Run the API and web app in separate terminals (the API defaults to port 3000; Next.js defaults to port 3000 too, so select a separate web port):
+Run the API and web app in separate terminals. The API is fixed at `127.0.0.1:3000`; the frontend development script is fixed at `localhost:3001`:
 
 ```bash
 # Terminal 1
@@ -122,10 +121,10 @@ set -a && . ./.env && set +a
 npm run dev:api
 
 # Terminal 2
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3000 npm run dev --workspace=@vendorproof/web -- --port 3001
+npm run dev:web
 ```
 
-Set `API_CORS_ORIGIN=http://localhost:3001` in `.env`. Check API health at `http://localhost:3000/health/live` and `/health/ready`, and open the web app at `http://localhost:3001`. Keep `SWYTCHCODE_TOKEN` server-side; provider methods remain unavailable unless the official Swytchcode setup is completed. Never point local development at the user's hosted staging/production database.
+Set `API_CORS_ORIGIN=http://localhost:3001` in `.env`. Check API health at `http://127.0.0.1:3000/health/live` and `/health/ready`, open the web app at `http://localhost:3001`, and verify `http://localhost:3001/api/v1/auth/me` returns Fastify's expected `401`, not a frontend `404`. Keep `SWYTCHCODE_TOKEN` server-side; provider methods remain unavailable unless the official Swytchcode setup is completed. Never point local development at the user's hosted staging/production database.
 
 ## Quality and release commands
 

@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  HOST: z.string().min(1).default('0.0.0.0'),
+  HOST: z.string().min(1).default('127.0.0.1'),
   API_CORS_ORIGIN: z
     .string()
     .url()

@@ -6,7 +6,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch src/dev.ts",
     "dev:api": "tsx watch src/api/index.ts",
     "dev:worker": "tsx watch src/worker/index.ts",
     "build": "tsc -p tsconfig.build.json",

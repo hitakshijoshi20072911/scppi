@@ -139,15 +139,24 @@ function HeroTimeline() {
             onUpdate: (self) => setActive(Math.min(3, Math.floor(self.progress * 4))),
           },
         })
+        const markerTween = gsap.to(marker.current, {
+          y: 10,
+          repeat: -1,
+          yoyo: true,
+          duration: 1.1,
+          ease: 'sine.inOut',
+        })
         scene
           .from('.vp-hero-copy > *', { y: 30, opacity: 0, stagger: 0.08, duration: 0.3 }, 0)
           .from('.vp-node', { opacity: 0, y: 24, stagger: 0.1, duration: 0.2 }, 0)
           .from('.vp-hero-snapshot', { opacity: 0, x: 45, duration: 0.35 }, 0.25)
           .to('.vp-hero-copy', { x: -90, opacity: 0.35, duration: 0.45 }, 0.55)
           .to('.vp-hero-snapshot', { x: -40, scale: 1.06, duration: 0.45 }, 0.55)
-        return () => scene.kill()
+        return () => {
+          scene.kill()
+          markerTween.kill()
+        }
       })
-      gsap.to(marker.current, { y: 10, repeat: -1, yoyo: true, duration: 1.1, ease: 'sine.inOut' })
     }, root)
     return () => ctx.revert()
   }, [])
@@ -605,7 +614,6 @@ function UseCases() {
             x: () => -getTravel(),
             ease: 'none',
             paused: true,
-            invalidateOnRefresh: true,
           }),
           onUpdate: (self) =>
             setActive(Math.min(cases.length - 1, Math.round(self.progress * (cases.length - 1)))),
@@ -673,26 +681,6 @@ export function LandingExperience() {
         start: 120,
         end: 'max',
         onUpdate: (self) => setHideNav(self.direction === 1 && self.scroll() > 240),
-      })
-      gsap.to('.vp-case-track', {
-        x: () =>
-          -(
-            Math.max(
-              0,
-              (document.querySelector('.vp-case-track') as HTMLElement)?.scrollWidth ?? 0,
-            ) -
-            window.innerWidth +
-            100
-          ),
-        ease: 'none',
-        scrollTrigger: {
-          trigger: '.vp-usecases',
-          start: 'top top',
-          end: '+=260%',
-          pin: true,
-          scrub: 1,
-          invalidateOnRefresh: true,
-        },
       })
       return () => navTrigger.kill()
     }, root)
