@@ -45,6 +45,22 @@ describe.skipIf(!enabled)('PostgreSQL core integration', () => {
     }
   }
 
+  function expectStatus(
+    response: {
+      statusCode: number
+      headers: Record<string, unknown>
+      json: () => unknown
+    },
+    expected: number,
+  ) {
+    if (response.statusCode !== expected) {
+      const body = response.json() as { code?: unknown; message?: unknown; requestId?: unknown }
+      throw new Error(
+        `Expected HTTP ${expected}, received ${response.statusCode}; requestId=${String(response.headers['x-request-id'] ?? 'missing')}; response=${JSON.stringify({ code: body.code, message: body.message, requestId: body.requestId })}`,
+      )
+    }
+  }
+
   beforeAll(async () => {
     server = await createServer()
   })
@@ -129,14 +145,79 @@ describe.skipIf(!enabled)('PostgreSQL core integration', () => {
       url: `/api/v1/workspaces/${session.workspaceId}/time-entries/${entryId}/submit`,
       headers: headers(session, true),
     })
-    expect(submitted.statusCode).toBe(200)
+    expectStatus(submitted, 200)
+    expect(submitted.json().data.status).toBe('submitted')
+    expect(submitted.json().data.submitted_at).toBeTruthy()
+    const submittedAgain = await server.inject({
+      method: 'POST',
+      url: `/api/v1/workspaces/${session.workspaceId}/time-entries/${entryId}/submit`,
+      headers: headers(session, true),
+    })
+    expectStatus(submittedAgain, 409)
     const approved = await server.inject({
       method: 'POST',
       url: `/api/v1/workspaces/${session.workspaceId}/time-entries/${entryId}/approve`,
       headers: headers(session, true),
     })
-    expect(approved.statusCode).toBe(200)
+    expectStatus(approved, 200)
     expect(approved.json().data.status).toBe('approved')
+    expect(approved.json().data.reviewer_id).toBe(session.userId)
+    expect(approved.json().data.reviewed_at).toBeTruthy()
+
+    const draftForApproval = await server.inject({
+      method: 'POST',
+      url: `/api/v1/workspaces/${session.workspaceId}/time-entries`,
+      headers: headers(session, true),
+      payload: {
+        projectId: project.id,
+        contractId: contract.id,
+        workDate: '2026-01-16',
+        durationMinutes: 30,
+        description: 'Remain in draft',
+      },
+    })
+    expectStatus(draftForApproval, 201)
+    const draftApprovalAttempt = await server.inject({
+      method: 'POST',
+      url: `/api/v1/workspaces/${session.workspaceId}/time-entries/${draftForApproval.json().data.id}/approve`,
+      headers: headers(session, true),
+    })
+    expectStatus(draftApprovalAttempt, 409)
+
+    const rejectedEntry = await server.inject({
+      method: 'POST',
+      url: `/api/v1/workspaces/${session.workspaceId}/time-entries`,
+      headers: headers(session, true),
+      payload: {
+        projectId: project.id,
+        contractId: contract.id,
+        workDate: '2026-01-17',
+        durationMinutes: 45,
+        description: 'Resubmission coverage',
+      },
+    })
+    expectStatus(rejectedEntry, 201)
+    const rejectedEntryId = rejectedEntry.json().data.id
+    const rejectedSubmit = await server.inject({
+      method: 'POST',
+      url: `/api/v1/workspaces/${session.workspaceId}/time-entries/${rejectedEntryId}/submit`,
+      headers: headers(session, true),
+    })
+    expectStatus(rejectedSubmit, 200)
+    const rejected = await server.inject({
+      method: 'POST',
+      url: `/api/v1/workspaces/${session.workspaceId}/time-entries/${rejectedEntryId}/reject`,
+      headers: headers(session, true),
+      payload: { reason: 'Needs clearer delivery notes' },
+    })
+    expectStatus(rejected, 200)
+    const resubmitted = await server.inject({
+      method: 'POST',
+      url: `/api/v1/workspaces/${session.workspaceId}/time-entries/${rejectedEntryId}/submit`,
+      headers: headers(session, true),
+    })
+    expectStatus(resubmitted, 200)
+    expect(resubmitted.json().data.status).toBe('submitted')
 
     const listed = await server.inject({
       method: 'GET',
@@ -178,6 +259,35 @@ describe.skipIf(!enabled)('PostgreSQL core integration', () => {
         effectiveDate: '2026-01-01',
       },
     })
+    const protectedEntry = await server.inject({
+      method: 'POST',
+      url: `/api/v1/workspaces/${first.workspaceId}/time-entries`,
+      headers: headers(first, true),
+      payload: {
+        projectId: project.json().data.id,
+        contractId: contract.json().data.id,
+        workDate: '2026-01-18',
+        durationMinutes: 20,
+        description: 'Workspace isolation transition',
+      },
+    })
+    expectStatus(protectedEntry, 201)
+    const protectedEntryId = protectedEntry.json().data.id
+    const wrongWorkspaceSubmit = await server.inject({
+      method: 'POST',
+      url: `/api/v1/workspaces/${first.workspaceId}/time-entries/${protectedEntryId}/submit`,
+      headers: headers(second, true),
+    })
+    expectStatus(wrongWorkspaceSubmit, 404)
+    const protectedEntryList = await server.inject({
+      method: 'GET',
+      url: `/api/v1/workspaces/${first.workspaceId}/time-entries`,
+      headers: headers(first),
+    })
+    expectStatus(protectedEntryList, 200)
+    expect(
+      protectedEntryList.json().data.find((row: Row) => row.id === protectedEntryId).status,
+    ).toBe('draft')
     const milestone = await server.inject({
       method: 'POST',
       url: `/api/v1/workspaces/${first.workspaceId}/milestones`,

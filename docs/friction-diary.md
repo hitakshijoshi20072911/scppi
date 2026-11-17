@@ -125,6 +125,14 @@ The GSAP warnings had two confirmed source patterns in `landing-experience.tsx`:
 - **Fixes:** removed `--passWithNoTests`; `check.ps1` now runs the integration suite with the locally provisioned `vendorproof_app` role and `NODE_ENV=test`; all landing animation contexts now use `root.current`, while the existing single-owner ScrollTrigger and cleanup logic remains intact.
 - **Verification boundary:** repository checks and the browser suite can run in this sandbox after dependency installation, but PowerShell, Docker Desktop, and a real PostgreSQL-backed restricted-role test remain Windows-side acceptance checks. No hosted service or other local Docker project was modified.
 
+## PostgreSQL time-entry transition failure — 2026-11-18
+
+- **Actual Windows result:** the user confirmed Node `v22.23.4`, Docker PostgreSQL readiness on `127.0.0.1:5433`, six applied migrations, and restricted-role setup. Integration test 1 then returned HTTP `500` while submitting a draft time entry; milestone/isolation and tenant-context tests passed. The report did not include a sanitized response body or request ID, so neither is reproduced here.
+- **Confirmed root cause:** `transition()` always used `$3`, `$4`, and `$5` for workspace, entity, and previous status while passing `auth.userId` as `$2` even for transitions with no `$2` assignment. Draft time-entry submission therefore passed an unused parameter and produced a PostgreSQL parameter-inference failure.
+- **Fix:** transition assignments and parameter indexes are now built together. Submission sets `submitted_at = now()`; approval sets `reviewer_id` and `reviewed_at`; milestone actor timestamps retain their existing semantics. Workspace, entity, previous-status predicates, role checks, and parameterization remain enforced.
+- **Regression coverage:** the integration suite now checks submission metadata, duplicate submission rejection, draft approval rejection, rejected-entry resubmission, wrong-workspace non-modification, and sanitized response diagnostics containing only status, code, message, and request ID.
+- **Verification boundary:** formatting, lint, typecheck, 81 unit tests, and production builds pass. This sandbox has no Docker/PostgreSQL, so the corrected database-backed integration suite has not been claimed as passing here; the user must rerun it locally with `APP_DATABASE_URL` using `vendorproof_app`.
+
 ## Windows migration path correction — 2026-11-17
 
 - **Reproduction:** after Node `v22.23.4`, Docker Desktop, PostgreSQL readiness on `127.0.0.1:5433`, and `npm ci` succeeded, the Windows migration command failed with `ENOENT: no such file or directory, scandir 'C:\C:\swytchcode\server\src\db\migrations'`.

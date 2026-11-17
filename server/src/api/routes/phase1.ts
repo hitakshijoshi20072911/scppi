@@ -796,17 +796,30 @@ async function transition(
     milestone: { completed: ['draft', 'in_progress'], accepted: ['completed'] },
   }
   const previous = allowed[table][next] ?? []
-  const extra =
-    table === 'time_entry' && next === 'approved'
-      ? ', reviewer_id = $2, reviewed_at = now()'
-      : table === 'milestone' && next === 'completed'
-        ? ', completed_by = $2, completed_at = now()'
-        : table === 'milestone' && next === 'accepted'
-          ? ', accepted_by = $2, accepted_at = now()'
-          : ''
-  const query = `update ${table} set status = $1, updated_at = now()${extra} where workspace_id = $3 and id = $4 and status = any($5::varchar[]) returning *`
+  const assignments = ['status = $1', 'updated_at = now()']
+  const values: (string | string[])[] = [next]
+  if (table === 'time_entry' && next === 'submitted') {
+    assignments.push('submitted_at = now()')
+  }
+  if (table === 'time_entry' && next === 'approved') {
+    assignments.push(`reviewer_id = $${values.length + 1}`, 'reviewed_at = now()')
+    values.push(auth.userId)
+  }
+  if (table === 'milestone' && next === 'completed') {
+    assignments.push(`completed_by = $${values.length + 1}`, 'completed_at = now()')
+    values.push(auth.userId)
+  }
+  if (table === 'milestone' && next === 'accepted') {
+    assignments.push(`accepted_by = $${values.length + 1}`, 'accepted_at = now()')
+    values.push(auth.userId)
+  }
+  const workspaceIndex = values.length + 1
+  const entityIndex = workspaceIndex + 1
+  const previousIndex = entityIndex + 1
+  const query = `update ${table} set ${assignments.join(', ')} where workspace_id = $${workspaceIndex} and id = $${entityIndex} and status = any($${previousIndex}::varchar[]) returning *`
+  values.push(workspaceId, entityId, previous)
   const [row] = await withDbContext({ userId: auth.userId, workspaceId }, (tx) =>
-    tx.unsafe(query, [next, auth.userId, workspaceId, entityId, previous]),
+    tx.unsafe(query, values),
   )
   if (!row)
     throw Object.assign(new Error('Invalid state transition or record not found'), {
