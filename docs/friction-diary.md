@@ -142,6 +142,15 @@ The GSAP warnings had two confirmed source patterns in `landing-experience.tsx`:
 - **Formatting/check workflow:** the five reported CSS files were run through Prettier and were unchanged in this checkout; `format:check` passes. `check.ps1` now runs database/repository checks and integration tests before HTTP health checks, and reports an actionable API-start message when port 3000 is not listening. The API remains on port 3000, frontend on 3001, and fresh `apps/web/.env.local` uses `http://localhost:3000`.
 - **Verification boundary:** this sandbox passes the non-database checks but has no Docker/PostgreSQL. The actual violated constraint name and consecutive database-backed integration results must be confirmed on the user's Windows database run; they are not fabricated here.
 
+## Final local verification cleanup — 2026-11-18
+
+- **Windows result from the attached report:** PostgreSQL integration passed 3/3 against the existing six-migration database; lint, typecheck, and production build passed. The remaining unit failure was caused by `APP_DATABASE_URL` inherited by `check.ps1`, making the health test observe `ready` instead of its intended isolated `not_configured` state.
+- **Environment correction:** `setup.ps1` now persists the restricted `APP_DATABASE_URL` in `.env` while retaining migration-owner `DATABASE_URL`. The runtime already prefers `APP_DATABASE_URL`; migrations continue using `DATABASE_URL`.
+- **Health/check correction:** health tests mock only `checkDatabase` and cover both `not_configured` and `ready` without weakening production readiness semantics. `check.ps1` temporarily clears database URLs for unit tests, supplies `APP_DATABASE_URL` only to integration tests, restores the original environment, checks every npm exit code immediately, and supports `-SkipHttpChecks`.
+- **HTTP diagnostics:** connection refusal reports that the API is not running; a live API returning HTTP 503 from `/health/ready` reports that the API is running but database readiness failed and includes the sanitized readiness JSON.
+- **CSS:** the five reported CSS files were run through Prettier and were already clean in this checkout, so no unrelated CSS diff was introduced.
+- **Verification boundary:** the attached report supplies the actual Windows 3/3 integration result. This sandbox independently passes format, lint, typecheck, 82 unit tests, integration discovery, and production build; it has no Docker/PostgreSQL for a second live database run.
+
 ## Windows migration path correction — 2026-11-17
 
 - **Reproduction:** after Node `v22.23.4`, Docker Desktop, PostgreSQL readiness on `127.0.0.1:5433`, and `npm ci` succeeded, the Windows migration command failed with `ENOENT: no such file or directory, scandir 'C:\C:\swytchcode\server\src\db\migrations'`.

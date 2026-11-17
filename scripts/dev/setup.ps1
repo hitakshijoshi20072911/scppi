@@ -77,6 +77,7 @@ Set-EnvDefault '.env' @{
   HOST = '127.0.0.1'
   API_CORS_ORIGIN = 'http://localhost:3001'
   DATABASE_URL = 'postgresql://vendorproof:vendorproof@127.0.0.1:5433/vendorproof'
+  APP_DATABASE_URL = 'postgresql://vendorproof_app:vendorproof_app@127.0.0.1:5433/vendorproof'
 }
 
 $webEnv = Join-Path $repoRoot 'apps/web/.env.local'

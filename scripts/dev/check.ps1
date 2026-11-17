@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+  [switch]$SkipHttpChecks
+)
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -16,6 +18,77 @@ function Assert-NodeRuntime {
   $nodeVersion = [version]::new([int]$Matches[1], [int]$Matches[2], [int]$Matches[3])
   if ($nodeVersion -lt [version]'22.23.4' -or $nodeVersion.Major -ge 23) {
     throw "Node.js $nodeRaw is incompatible. VendorProof requires >=22.23.4 and <23. Install the official MSI; nvm is not required."
+  }
+}
+
+function Invoke-NpmGate {
+  param(
+    [string]$Name,
+    [string[]]$Arguments
+  )
+  & npm @Arguments
+  $exitCode = $LASTEXITCODE
+  if ($exitCode -ne 0) {
+    throw "$Name failed with exit code $exitCode."
+  }
+}
+
+function Invoke-NpmGateWithEnvironment {
+  param(
+    [string]$Name,
+    [string[]]$Arguments,
+    [hashtable]$Environment
+  )
+  $saved = @{}
+  foreach ($key in $Environment.Keys) {
+    $saved[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
+    [Environment]::SetEnvironmentVariable($key, $Environment[$key], 'Process')
+  }
+  try {
+    Invoke-NpmGate $Name $Arguments
+  } finally {
+    foreach ($key in $Environment.Keys) {
+      [Environment]::SetEnvironmentVariable($key, $saved[$key], 'Process')
+    }
+  }
+}
+
+function Get-HttpErrorBody {
+  param([object]$Response)
+  try {
+    $stream = $Response.GetResponseStream()
+    if ($null -ne $stream) {
+      $reader = [IO.StreamReader]::new($stream)
+      try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
+    }
+  } catch { }
+  return '<no response body>'
+}
+
+function Assert-HttpStatus {
+  param(
+    [string]$Url,
+    [int]$ExpectedStatus,
+    [string]$StartupHint
+  )
+  try {
+    $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 10
+    $status = [int]$response.StatusCode
+    if ($status -ne $ExpectedStatus) {
+      throw "HTTP $status; response=$($response.Content)"
+    }
+  } catch {
+    $httpResponse = $_.Exception.Response
+    if ($null -eq $httpResponse) {
+      throw "$StartupHint URL=$Url; connection error: $($_.Exception.Message)"
+    }
+    $status = [int]$httpResponse.StatusCode
+    $body = Get-HttpErrorBody $httpResponse
+    if ($status -eq $ExpectedStatus) { return }
+    if ($Url -like '*/health/ready' -and $status -eq 503) {
+      throw "API is running but its database readiness check failed. HTTP 503; sanitized readiness response=$body"
+    }
+    throw "API/frontend is running but returned HTTP $status from $Url; response=$body"
   }
 }
 
@@ -45,30 +118,26 @@ if ($LASTEXITCODE -ne 0 -or [int]$appliedMigrations -ne $expectedMigrations) {
 }
 Write-Host "Migrations: $appliedMigrations applied"
 
-# setup.ps1 provisions this disposable local password only for restricted-role
-# verification. Keep it in the process environment and never print it.
-$env:APP_DATABASE_URL = 'postgresql://vendorproof_app:vendorproof_app@127.0.0.1:5433/vendorproof'
-$env:NODE_ENV = 'test'
-
-function Assert-HttpStatus {
-  param([string]$Url, [int]$ExpectedStatus, [string]$StartupHint)
-  try {
-    $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 10
-    if ([int]$response.StatusCode -ne $ExpectedStatus) { throw "returned HTTP $($response.StatusCode)" }
-  } catch {
-    if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq $ExpectedStatus) { return }
-    throw "$StartupHint Expected HTTP $ExpectedStatus from $Url, but the request failed: $($_.Exception.Message)"
-  }
+Invoke-NpmGate 'Database metadata check' @('run', 'db:check')
+Invoke-NpmGate 'Format check' @('run', 'format:check')
+Invoke-NpmGate 'Lint' @('run', 'lint')
+Invoke-NpmGate 'Typecheck' @('run', 'typecheck')
+Invoke-NpmGateWithEnvironment 'Unit tests' @('run', 'test:unit') @{
+  APP_DATABASE_URL = $null
+  DATABASE_URL = $null
+  NODE_ENV = 'test'
 }
+Invoke-NpmGateWithEnvironment 'Integration tests' @('run', 'test:integration') @{
+  APP_DATABASE_URL = 'postgresql://vendorproof_app:vendorproof_app@127.0.0.1:5433/vendorproof'
+  DATABASE_URL = $null
+  NODE_ENV = 'test'
+}
+Invoke-NpmGate 'Production build' @('run', 'build')
 
-npm run db:check
-npm run format:check
-npm run lint
-npm run typecheck
-npm run test:unit
-npm run test:integration
-npm run build
-if ($LASTEXITCODE -ne 0) { throw 'A repository quality gate failed.' }
+if ($SkipHttpChecks) {
+  Write-Host 'Repository and database checks passed. HTTP checks skipped by -SkipHttpChecks.'
+  exit 0
+}
 
 Write-Host 'Repository and database checks passed. Verifying separately started API and frontend services...'
 Assert-HttpStatus 'http://localhost:3000/health/live' 200 'API is not running. Start npm run dev:api in another terminal and rerun this check.'

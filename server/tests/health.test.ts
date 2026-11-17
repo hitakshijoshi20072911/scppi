@@ -1,8 +1,18 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('../src/db/client.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/db/client.js')>()
+  return { ...actual, checkDatabase: vi.fn() }
+})
 import { createServer } from '../src/api/index.js'
 import { isDatabaseReady } from '../src/api/routes/health.js'
+import { checkDatabase } from '../src/db/client.js'
 
 let server: Awaited<ReturnType<typeof createServer>> | undefined
+const mockedCheckDatabase = vi.mocked(checkDatabase)
+
+beforeEach(() => {
+  mockedCheckDatabase.mockResolvedValue('not_configured')
+})
 
 afterEach(async () => {
   await server?.close()
@@ -36,6 +46,17 @@ describe('health endpoints', () => {
     expect(response.json()).toMatchObject({
       status: 'ready',
       checks: { database: 'not_configured' },
+    })
+  })
+
+  it('reports readiness when the database health check is ready', async () => {
+    mockedCheckDatabase.mockResolvedValue('ready')
+    server = await createServer()
+    const response = await server.inject({ method: 'GET', url: '/health/ready' })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({
+      status: 'ready',
+      checks: { database: 'ready' },
     })
   })
 
