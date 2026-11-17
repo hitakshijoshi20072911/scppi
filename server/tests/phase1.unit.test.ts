@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createServer } from '../src/api/index.js'
-import { can, hashPassword, validatePassword, verifyPassword } from '../src/modules/core.js'
+import {
+  can,
+  hashPassword,
+  sessionCookieName,
+  setSessionCookie,
+  validatePassword,
+  verifyPassword,
+} from '../src/modules/core.js'
 import { runtimeDatabaseUrl } from '../src/db/client.js'
 import { configSchema } from '../src/platform/config.js'
 
@@ -54,6 +61,17 @@ describe('Phase 1 security primitives', () => {
   it('enforces a minimum password policy', () => {
     expect(validatePassword('short1')).toBe(false)
     expect(validatePassword('long-enough-password-1')).toBe(true)
+  })
+
+  it('uses a non-prefixed local cookie and a strict __Host cookie when hosted', () => {
+    expect(sessionCookieName('development')).toBe('vendorproof_session')
+    expect(sessionCookieName('production')).toBe('__Host-vendorproof_session')
+
+    const local = { value: '' }
+    setSessionCookie({ header: (_name, value) => (local.value = String(value)) }, 'local-token')
+    expect(local.value).toContain('vendorproof_session=local-token')
+    expect(local.value).toContain('SameSite=Lax')
+    expect(local.value).not.toContain('Secure')
   })
 
   it('rejects protected tenant routes before touching tenant data', async () => {

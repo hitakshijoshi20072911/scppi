@@ -17,6 +17,7 @@
     "lint": "eslint src --ext .ts",
     "test": "vitest",
     "test:unit": "vitest run",
+    "test:integration": "vitest run tests/integration --passWithNoTests",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:check": "drizzle-kit check --config drizzle.config.ts"

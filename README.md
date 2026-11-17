@@ -37,7 +37,7 @@ Current limitations include pending hosted database migrations, pending restrict
 flowchart LR
   B[Browser] -->|HTTPS, same-origin /api proxy| V[Vercel: Next.js apps/web]
   V -->|HTTPS, exact-origin allowlist| R[Render: Fastify API]
-  R -->|DATABASE_URL secret| S[(Supabase PostgreSQL)]
+  R -->|APP_DATABASE_URL secret| S[(Supabase PostgreSQL)]
   R -->|Official Swytchcode Runtime, server-only token| W[GitHub / Stripe test / Google Calendar]
   R -. future durable jobs .-> Q[Worker / queue not provisioned]
 ```
@@ -107,7 +107,7 @@ npm ci
 cp .env.example .env    # keep real values out of Git
 ```
 
-Set `DATABASE_URL` in the ignored `.env` to a **local** PostgreSQL database before applying local migrations. Start the local database using `docker compose up -d postgres`, then run:
+Set `DATABASE_URL` in the ignored `.env` to a **local** PostgreSQL database before applying local migrations. The Windows-supported Compose path binds VendorProof to `127.0.0.1:5433` so another PostgreSQL project can continue using host port `5432`; see [`docs/LOCAL_SETUP_WINDOWS.md`](docs/LOCAL_SETUP_WINDOWS.md). Start the local database using `docker compose up -d postgres`, then run:
 
 ```bash
 set -a && . ./.env && set +a

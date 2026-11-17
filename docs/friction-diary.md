@@ -102,3 +102,11 @@ Resolution status: local source checks pass; hosted migration, recoverable logic
 - No hosted database, provider account, Render/Vercel configuration, migration, paid resource, financial action, or production deployment was changed. The existing Vercel Preview still has no branch-specific isolated API/database configuration; do not treat it as an authenticated product preview.
 
 Resolution status: local feature implementation complete pending final verification and PR update; hosted Preview isolation, backups/credential rotation, migrations/RLS integration test, and live provider authentication remain blocked.
+
+## Core repair and Windows readiness — 2026-11-17
+
+- **Repository/branch:** Fetched `origin/main` at `3ca8a9a2e4cc0f6848791aec5f04c06f23e865e7` and created `feat/vendorproof-local-and-core-repair`.
+- **Confirmed issues:** `docker-compose.yml` bound VendorProof to host port `5432`; `render.yaml` exposed `DATABASE_URL` even though hosted runtime code requires `APP_DATABASE_URL`; local session responses attempted to use the `__Host-` cookie name without `Secure`; and no PostgreSQL integration-test command or Windows setup/check scripts existed.
+- **Fixes:** Compose now binds only `127.0.0.1:5433`; Render uses `APP_DATABASE_URL`; local development uses `vendorproof_session` with `SameSite=Lax`, while staging/production retain `__Host-vendorproof_session`, `Secure`, `HttpOnly`, and `Path=/`; added idempotent `scripts/dev/setup.ps1`, `scripts/dev/check.ps1`, `docs/LOCAL_SETUP_WINDOWS.md`, and PostgreSQL integration coverage for sessions, CRUD, approvals, two-workspace isolation, and restricted-role RLS.
+- **Verification:** `npm ci` succeeded; format, lint, server/web typecheck, 80 unit tests, server/web production builds, `drizzle-kit check`, `npm audit --omit=dev --audit-level=high`, and `git diff --check` passed. `npm run test:integration` discovered the three integration tests but skipped them because this sandbox has no configured PostgreSQL URL; Docker is not installed here. No hosted database, production service, or other Docker project was touched.
+- **Minor friction:** The first quality run stopped on Prettier formatting for the new integration test. Running `npx prettier --write server/tests/integration/core.integration.test.ts` resolved it; all subsequent static/unit gates passed.
