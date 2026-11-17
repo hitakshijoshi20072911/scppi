@@ -157,7 +157,7 @@ function HeroTimeline() {
           markerTween.kill()
         }
       })
-    }, root)
+    }, root.current ?? undefined)
     return () => ctx.revert()
   }, [])
   const current = snapshots[active]
@@ -235,7 +235,7 @@ function ScrollStatement() {
         stagger: 0.08,
         scrollTrigger: { trigger: root.current, start: 'top 72%', end: 'bottom 44%', scrub: true },
       })
-    }, root)
+    }, root.current ?? undefined)
     return () => ctx.revert()
   }, [])
   return (
@@ -356,7 +356,7 @@ function WorkflowScene() {
           sequence.kill()
         }
       })
-    }, root)
+    }, root.current ?? undefined)
     return () => ctx.revert()
   }, [])
   const stageData = whyStages[stage]
@@ -633,7 +633,7 @@ function UseCases() {
       }
       track.current?.addEventListener('scroll', onNativeScroll, { passive: true })
       return () => track.current?.removeEventListener('scroll', onNativeScroll)
-    }, root)
+    }, root.current ?? undefined)
     return () => ctx.revert()
   }, [cases.length])
   return (
@@ -683,7 +683,7 @@ export function LandingExperience() {
         onUpdate: (self) => setHideNav(self.direction === 1 && self.scroll() > 240),
       })
       return () => navTrigger.kill()
-    }, root)
+    }, root.current ?? undefined)
     return () => ctx.revert()
   }, [])
   return (

@@ -45,6 +45,11 @@ if ($LASTEXITCODE -ne 0 -or [int]$appliedMigrations -ne $expectedMigrations) {
 }
 Write-Host "Migrations: $appliedMigrations applied"
 
+# setup.ps1 provisions this disposable local password only for restricted-role
+# verification. Keep it in the process environment and never print it.
+$env:APP_DATABASE_URL = 'postgresql://vendorproof_app:vendorproof_app@127.0.0.1:5433/vendorproof'
+$env:NODE_ENV = 'test'
+
 function Assert-HttpStatus {
   param([string]$Url, [int]$ExpectedStatus)
   try {
