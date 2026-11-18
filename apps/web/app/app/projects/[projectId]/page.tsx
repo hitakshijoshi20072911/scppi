@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/components/auth-provider'
-import { RecordRow, workspaceApi } from '@/lib/api'
+import { providerPortalApi, RecordRow, workspaceApi } from '@/lib/api'
 
 type ProjectData = {
   project: RecordRow
@@ -35,6 +35,9 @@ export default function ProjectDetailPage() {
   const { activeWorkspace } = useAuth()
   const [data, setData] = useState<ProjectData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [deliverables, setDeliverables] = useState<RecordRow[]>([])
+  const [deliverableForm, setDeliverableForm] = useState({ title: '', amount: '', dueDate: '' })
+  const [shareOpen, setShareOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [selectedRun, setSelectedRun] = useState<string | null>(null)
@@ -128,6 +131,58 @@ export default function ProjectDetailPage() {
       )
     } finally {
       setBusyRun(null)
+    }
+  }
+
+  useEffect(() => {
+    if (!activeWorkspace || !projectId) return
+    providerPortalApi(activeWorkspace.id)
+      .projectDeliverables(projectId)
+      .then(setDeliverables)
+      .catch(() => setDeliverables([]))
+  }, [activeWorkspace, projectId, data])
+
+  async function addDeliverable() {
+    if (!activeWorkspace || !projectId || !deliverableForm.title.trim()) return
+    try {
+      await providerPortalApi(activeWorkspace.id).createDeliverable({
+        projectId,
+        title: deliverableForm.title.trim(),
+        amountMinor: deliverableForm.amount
+          ? Math.round(Number(deliverableForm.amount) * 100)
+          : undefined,
+        currency: 'usd',
+        dueDate: deliverableForm.dueDate || undefined,
+      })
+      setDeliverableForm({ title: '', amount: '', dueDate: '' })
+      setDeliverables(await providerPortalApi(activeWorkspace.id).projectDeliverables(projectId))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Deliverable could not be created.')
+    }
+  }
+  async function submitDeliverable(id: string) {
+    if (!activeWorkspace) return
+    try {
+      await providerPortalApi(activeWorkspace.id).submitDeliverable(id)
+      setDeliverables(await providerPortalApi(activeWorkspace.id).projectDeliverables(projectId))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Deliverable could not be submitted.')
+    }
+  }
+  async function shareWithClient() {
+    if (!activeWorkspace || !projectId || !data?.client?.id) return
+    try {
+      await providerPortalApi(activeWorkspace.id).createEngagement({
+        projectId,
+        name: String(data.project.name ?? 'Project'),
+        description: data.project.description ? String(data.project.description) : undefined,
+        status: 'active',
+      })
+      setShareOpen(false)
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Project could not be shared with the client.',
+      )
     }
   }
 
@@ -367,6 +422,80 @@ export default function ProjectDetailPage() {
             )}
           </div>
         )}
+      </section>
+
+      <section className="panel panel-large">
+        <div className="panel-toolbar">
+          <div>
+            <p className="eyebrow">Client deliverables</p>
+            <h2>
+              Work shared with{' '}
+              {data.client ? String(data.client.name ?? 'the client') : 'the client'}
+            </h2>
+          </div>
+          <div className="record-actions">
+            {data.client && (
+              <button className="button button-ghost" onClick={shareWithClient}>
+                {shareOpen ? 'Shared ✓' : 'Share project with client'}
+              </button>
+            )}
+          </div>
+        </div>
+        <p className="panel-copy">
+          Deliverables submitted here appear in the client portal for review and acceptance.
+        </p>
+        <form
+          className="inline-form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void addDeliverable()
+          }}
+        >
+          <input
+            required
+            placeholder="Deliverable title"
+            value={deliverableForm.title}
+            onChange={(e) => setDeliverableForm({ ...deliverableForm, title: e.target.value })}
+          />
+          <input
+            placeholder="Amount (e.g. 2500.00)"
+            value={deliverableForm.amount}
+            onChange={(e) => setDeliverableForm({ ...deliverableForm, amount: e.target.value })}
+          />
+          <input
+            type="date"
+            value={deliverableForm.dueDate}
+            onChange={(e) => setDeliverableForm({ ...deliverableForm, dueDate: e.target.value })}
+          />
+          <button className="button button-dark">Add deliverable</button>
+        </form>
+        <div className="record-table">
+          {deliverables.length ? (
+            deliverables.map((d) => (
+              <div className="record-row" key={String(d.id)}>
+                <div>
+                  <strong>{String(d.title)}</strong>
+                  <small>
+                    {d.amount_minor != null
+                      ? `${(Number(d.amount_minor) / 100).toFixed(2)}`
+                      : 'No amount'}
+                    {d.due_date ? ` · due ${String(d.due_date).slice(0, 10)}` : ''}
+                  </small>
+                </div>
+                <div className="record-actions">
+                  <span className="record-status">{String(d.status)}</span>
+                  {['draft', 'changes_requested'].includes(String(d.status)) && (
+                    <button className="text-button" onClick={() => submitDeliverable(String(d.id))}>
+                      Submit for review
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="panel-copy">No deliverables yet.</p>
+          )}
+        </div>
       </section>
 
       <section className="panel panel-large project-activity-panel">
