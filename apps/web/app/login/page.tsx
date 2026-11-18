@@ -17,7 +17,14 @@ export default function LoginPage() {
     setError(null)
     try {
       await login(form)
-      router.replace('/app')
+      const intent = (await import('@/lib/api')).portalApi
+      try {
+        const overview = await intent.overview()
+        const hasPortal = Array.isArray(overview?.contexts) && overview.contexts.length > 0
+        router.replace(hasPortal ? '/portal' : '/app')
+      } catch {
+        router.replace('/app')
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Sign in could not be completed.')
     } finally {

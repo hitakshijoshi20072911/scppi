@@ -27,6 +27,7 @@ const registerSchema = z
     name: z.string().trim().min(1).max(120),
     password: z.string().min(12).max(128),
     workspaceName: z.string().trim().min(2).max(160).optional(),
+    accountType: z.enum(['provider', 'client', 'both']).default('provider'),
   })
   .strict()
 const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) }).strict()
@@ -157,7 +158,7 @@ export async function phase1Routes(app: FastifyInstance) {
       const result = await db.begin(async (tx) => {
         await setDbContext(tx, { authEmail: email })
         const [user] =
-          await tx`insert into app_user (email, name, password_hash) values (${email}, ${input.name}, ${await hashPassword(input.password)}) returning id, email, name, status, created_at`
+          await tx`insert into app_user (email, name, password_hash, signup_intent) values (${email}, ${input.name}, ${await hashPassword(input.password)}, ${input.accountType}) returning id, email, name, status, created_at, signup_intent`
         await setDbContext(tx, { userId: String(user.id) })
         const name = input.workspaceName ?? `${input.name}'s workspace`
         const baseSlug = slugify(name) || 'workspace'
@@ -248,7 +249,7 @@ export async function phase1Routes(app: FastifyInstance) {
       { userId: auth.userId, sessionId: auth.sessionId },
       async (tx) => {
         const [user] =
-          await tx`select id, email, name, status, created_at, last_login_at from app_user where id = ${auth.userId}`
+          await tx`select id, email, name, status, created_at, last_login_at, signup_intent from app_user where id = ${auth.userId}`
         const workspaces =
           await tx`select w.id, w.name, w.slug, m.role from workspace w join membership m on m.workspace_id = w.id where m.user_id = ${auth.userId} and m.status = 'active'`
         return { user, workspaces }

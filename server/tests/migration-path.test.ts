@@ -22,6 +22,7 @@ describe('migration path resolution', () => {
       '0006_provider_connections.sql',
       '0007_two_sided_platform.sql',
       '0008_client_portal_functions.sql',
+      '0009_signup_intent.sql',
     ])
   })
 })
