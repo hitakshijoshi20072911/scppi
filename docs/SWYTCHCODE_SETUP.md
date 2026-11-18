@@ -10,6 +10,7 @@
 
 - GitHub (read-only): `github.pull.get`, `github.pull.commits.get`
 - Stripe (read-only): `stripe.customer.list`, `stripe.customer.get`, `stripe.invoice.list`, `stripe.invoice.get`
+- Stripe (test checkout): `stripe.session.create1`, `stripe.session.get` — hosted Checkout only, no direct charges
 - Stripe write methods (`customer.create`, `invoice.create`, `invoiceitem.*`) remain disabled pending explicit approval and the reviewed draft path.
 
 ## Tenant connections

@@ -33,6 +33,22 @@ export default function ClientPortalPage() {
     if (!loading && user) load()
   }, [loading, user, load])
 
+  async function payInvoice(invoice: RecordRow) {
+    const id = String(invoice.id)
+    setPending(id)
+    setError(null)
+    try {
+      const result = await portalApi.checkoutInvoice(id)
+      window.open(result.url, '_blank', 'noopener')
+      await portalApi.verifyInvoicePayment(id).catch(() => undefined)
+      load()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Checkout could not be started.')
+    } finally {
+      setPending(null)
+    }
+  }
+
   async function decide(kind: 'contract' | 'deliverable', id: string, decision: string) {
     setPending(id)
     setError(null)
@@ -223,7 +239,18 @@ export default function ClientPortalPage() {
                         {inv.due_date ? ` · due ${String(inv.due_date).slice(0, 10)}` : ''}
                       </small>
                     </div>
-                    <span className="record-status">{String(inv.status)}</span>
+                    <div className="record-actions">
+                      <span className="record-status">{String(inv.status)}</span>
+                      {['issued', 'open', 'overdue'].includes(String(inv.status)) && (
+                        <button
+                          className="button button-dark"
+                          disabled={pending === String(inv.id)}
+                          onClick={() => payInvoice(inv)}
+                        >
+                          Pay test
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))
               ) : (

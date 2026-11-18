@@ -164,3 +164,10 @@ The GSAP warnings had two confirmed source patterns in `landing-experience.tsx`:
 - **Executor envelope bug (fixed):** `@swytchcode/runtime` `exec()` resolves to `{data, request, status_code}`, not the raw provider payload. `createSwytchcodeRuntimeTransport` returned the envelope, so `GithubAdapter` schema validation failed with `INVALID_PROVIDER_RESPONSE` → HTTP 409 `GITHUB_VERIFICATION_FAILED` even though `provider_execution` recorded `succeeded`. Transport now unwraps `.data` and JSON-parses string payloads.
 - **Stripe connect:** implemented `POST /api/v1/workspaces/:id/integrations/stripe/connect|verify|disconnect` + `GET .../integrations` backed by migration `0006_provider_connections` (RLS-enabled). Key is validated as `sk_test_`, saved via runtime `saveKey`, then verified with bounded `stripe.customer.list` (`limit: 1`) before `status='connected'`. GET initially returned `[]` because `withDbContext` lacked `userId`, so `vendorproof_is_active_workspace_member` failed under RLS — fixed.
 - **Verification:** real GitHub `pull.get`/`pull.commits.get` and Stripe `customer.list` reads succeeded through the workspace tenant on 2026-11-18.
+
+## Two-sided platform + Stripe checkout — 2026-11-18
+
+- **RLS on client writes:** client-portal mutations initially failed — `audit_event` and provider tables only have workspace-member policies. Fixed with SECURITY DEFINER functions (`0008`) for invitation acceptance and client contract/deliverable decisions; client billing writes record to `client_invoice_event` only.
+- **Portal overview joins:** joining client/workspace tables under a context without `app.workspace_id` returned empty; fixed by iterating memberships and querying per-workspace.
+- **Stripe checkout schema:** `stripe.session.create1` requires `line_items` as an index-keyed object (`{"0": {...}}`), rejects array form; `payment_method_types` is deprecated by Stripe — removed. Real checkout session created successfully in test mode.
+- **Payment truth:** invoices are marked paid only after `stripe.session.get` reports `payment_status=paid`; the browser redirect is never trusted.
