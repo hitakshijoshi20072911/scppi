@@ -46,11 +46,20 @@ export function createSwytchcodeRuntimeTransport(): SwytchcodeTransport | undefi
           value === null ? '' : String(value),
         ]),
       )
-      return swytchcodeExec(
+      const result = await swytchcodeExec(
         request.methodId,
         { params },
         { tenantId: request.identity.workspaceId, timeoutMs: runtimeTimeoutMs },
       )
+      const data = isPlainRecord(result) && Object.hasOwn(result, 'data') ? result.data : result
+      if (typeof data === 'string') {
+        try {
+          return JSON.parse(data)
+        } catch {
+          return data
+        }
+      }
+      return data
     },
   }
 }

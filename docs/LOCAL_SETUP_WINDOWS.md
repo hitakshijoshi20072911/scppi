@@ -73,3 +73,9 @@ docker compose stop postgres
 ```
 
 Do not use `docker compose down -v` for routine cleanup; that deletes the VendorProof volume. The normal local setup uses the persistent `vendorproof` database; do not point tests at `vendorproof_integration` unless you explicitly create that database in a separate disposable Compose project.
+
+## Provider integrations (verified 2026-11-18)
+
+- GitHub tenant OAuth and Stripe test-mode `saveKey` both work locally through Swytchcode; see `docs/SWYTCHCODE_SETUP.md` for the auth-widget workaround and enabled methods.
+- Stripe connection is entered in the browser at `/app/integrations` (test `sk_test_` key only); the API verifies with a bounded `customer.list` read before marking connected.
+- Migration `0006_provider_connections.sql` adds the `provider_connection` table; run `npm run db:migrate` after pulling.

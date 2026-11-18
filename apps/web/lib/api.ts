@@ -229,6 +229,23 @@ export function workspaceApi(workspaceId: string) {
         `/api/v1/workspaces/${workspaceId}/projects/${projectId}/sources/${sourceId}/disconnect`,
         { method: 'POST', retry: false },
       ),
+    integrations: () => apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/integrations`),
+    connectStripe: (apiKey: string) =>
+      apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/integrations/stripe/connect`, {
+        method: 'POST',
+        body: { apiKey },
+        retry: false,
+      }),
+    verifyStripe: () =>
+      apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/integrations/stripe/verify`, {
+        method: 'POST',
+        retry: false,
+      }),
+    disconnectStripe: () =>
+      apiRequest<{ disconnected: boolean }>(
+        `/api/v1/workspaces/${workspaceId}/integrations/stripe/disconnect`,
+        { method: 'POST', retry: false },
+      ),
     runs: {
       list: (projectId: string) =>
         apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/runs`),

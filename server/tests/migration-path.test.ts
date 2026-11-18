@@ -19,6 +19,7 @@ describe('migration path resolution', () => {
       '0003_commit_provenance.sql',
       '0004_phase3_invoice_approval.sql',
       '0005_vendorproof_app_rls.sql',
+      '0006_provider_connections.sql',
     ])
   })
 })
