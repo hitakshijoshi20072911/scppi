@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/components/auth-provider'
-import { RecordRow, workspaceApi } from '@/lib/api'
+import { RecordRow, workspaceApi, providerPortalApi } from '@/lib/api'
 export default function ClientsPage() {
   const { activeWorkspace } = useAuth()
   const [clients, setClients] = useState<RecordRow[] | null>(null)
@@ -48,6 +48,30 @@ export default function ClientsPage() {
       setError(cause instanceof Error ? cause.message : 'Client could not be created.')
     } finally {
       setPending(false)
+    }
+  }
+  async function inviteClient(client: RecordRow) {
+    if (!activeWorkspace) return
+    const email = window.prompt('Client portal email', String(client.contact_email ?? ''))
+    if (!email || !email.includes('@')) return
+    const role =
+      window.prompt(
+        'Role (client_owner, client_admin, billing_approver, client_viewer)',
+        'client_viewer',
+      ) ?? 'client_viewer'
+    try {
+      const result = await providerPortalApi(activeWorkspace.id).inviteClient(
+        String(client.id),
+        email.trim(),
+        role.trim(),
+      )
+      const path = String(result.acceptPath ?? '')
+      window.alert(`Invitation created.
+
+Share this one-time link with the client:
+${window.location.origin}${path}`)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Invitation could not be created.')
     }
   }
   return (
@@ -98,6 +122,9 @@ export default function ClientsPage() {
                   <span className="record-status">{String(client.status ?? 'active')}</span>
                   {client.status !== 'archived' && (
                     <>
+                      <button className="text-button" onClick={() => inviteClient(client)}>
+                        Invite portal
+                      </button>
                       <button
                         className="text-button"
                         onClick={async () => {

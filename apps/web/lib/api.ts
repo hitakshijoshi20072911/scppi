@@ -299,6 +299,100 @@ export function workspaceApi(workspaceId: string) {
   }
 }
 
+export const portalApi = {
+  acceptInvitation: (token: string) =>
+    apiRequest<{ workspaceId: string; clientId: string; role: string }>(
+      '/api/v1/portal/invitations/accept',
+      { method: 'POST', body: { token }, retry: false },
+    ),
+  overview: () => apiRequest<{ userId: string; contexts: RecordRow[] }>('/api/v1/portal/overview'),
+  contractDecision: (versionId: string, decision: string, reason?: string) =>
+    apiRequest<{ decision: string }>(`/api/v1/portal/contract-versions/${versionId}/decision`, {
+      method: 'POST',
+      body: { decision, reason },
+      retry: false,
+    }),
+  deliverableDecision: (deliverableId: string, decision: string, reason?: string) =>
+    apiRequest<{ decision: string }>(`/api/v1/portal/deliverables/${deliverableId}/decision`, {
+      method: 'POST',
+      body: { decision, reason },
+      retry: false,
+    }),
+  invoice: (invoiceId: string) => apiRequest<RecordRow>(`/api/v1/portal/invoices/${invoiceId}`),
+  markNotificationRead: (notificationId: string) =>
+    apiRequest<{ read: boolean }>(`/api/v1/portal/notifications/${notificationId}/read`, {
+      method: 'POST',
+      retry: false,
+    }),
+}
+
+export const providerPortalApi = (workspaceId: string) => ({
+  inviteClient: (clientId: string, email: string, role: string) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/clients/${clientId}/invitations`, {
+      method: 'POST',
+      body: { email, role },
+      retry: false,
+    }),
+  clientInvitations: (clientId: string) =>
+    apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/clients/${clientId}/invitations`),
+  clientPortal: (clientId: string) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/clients/${clientId}/portal`),
+  revokeInvitation: (clientId: string, invitationId: string) =>
+    apiRequest<{ revoked: boolean }>(
+      `/api/v1/workspaces/${workspaceId}/clients/${clientId}/invitations/${invitationId}/revoke`,
+      { method: 'POST', retry: false },
+    ),
+  createEngagement: (body: Record<string, unknown>) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/engagements`, {
+      method: 'POST',
+      body,
+      retry: false,
+    }),
+  engagements: () => apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/engagements`),
+  contractVersions: (contractId: string) =>
+    apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/contracts/${contractId}/versions`),
+  createContractVersion: (contractId: string, body: Record<string, unknown>) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/contracts/${contractId}/versions`, {
+      method: 'POST',
+      body,
+      retry: false,
+    }),
+  providerAcceptVersion: (contractId: string, versionId: string) =>
+    apiRequest<{ accepted: boolean }>(
+      `/api/v1/workspaces/${workspaceId}/contracts/${contractId}/versions/${versionId}/provider-accept`,
+      { method: 'POST', retry: false },
+    ),
+  createDeliverable: (body: Record<string, unknown>) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/deliverables`, {
+      method: 'POST',
+      body,
+      retry: false,
+    }),
+  projectDeliverables: (projectId: string) =>
+    apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/deliverables`),
+  submitDeliverable: (deliverableId: string) =>
+    apiRequest<{ submitted: boolean }>(
+      `/api/v1/workspaces/${workspaceId}/deliverables/${deliverableId}/submit`,
+      {
+        method: 'POST',
+        retry: false,
+      },
+    ),
+  projectLifecycle: (projectId: string, event: string, reason?: string) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/lifecycle`, {
+      method: 'POST',
+      body: { event, reason },
+      retry: false,
+    }),
+  issueInvoice: (previewId: string) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/invoice-previews/${previewId}/issue`, {
+      method: 'POST',
+      retry: false,
+    }),
+  clientInvoices: () =>
+    apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/client-invoices`),
+})
+
 export const invoiceApi = (workspaceId: string) => ({
   eligibleRuns: () =>
     apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/invoice-eligible-runs`),

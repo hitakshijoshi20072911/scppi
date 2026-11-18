@@ -20,6 +20,8 @@ describe('migration path resolution', () => {
       '0004_phase3_invoice_approval.sql',
       '0005_vendorproof_app_rls.sql',
       '0006_provider_connections.sql',
+      '0007_two_sided_platform.sql',
+      '0008_client_portal_functions.sql',
     ])
   })
 })
