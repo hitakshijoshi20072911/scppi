@@ -1,5 +1,4 @@
 import type { FastifyInstance, FastifyReply } from 'fastify'
-import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { exec as runtimeExec } from '@swytchcode/runtime'
 import { authenticate, withDbContext } from '../../modules/core.js'
