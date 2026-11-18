@@ -319,6 +319,19 @@ export const portalApi = {
       retry: false,
     }),
   invoice: (invoiceId: string) => apiRequest<RecordRow>(`/api/v1/portal/invoices/${invoiceId}`),
+  checkoutInvoice: (invoiceId: string) =>
+    apiRequest<{ url: string; sessionId: string }>(
+      `/api/v1/portal/invoices/${invoiceId}/checkout`,
+      {
+        method: 'POST',
+        retry: false,
+      },
+    ),
+  verifyInvoicePayment: (invoiceId: string) =>
+    apiRequest<{ status: string }>(`/api/v1/portal/invoices/${invoiceId}/verify-payment`, {
+      method: 'POST',
+      retry: false,
+    }),
   markNotificationRead: (notificationId: string) =>
     apiRequest<{ read: boolean }>(`/api/v1/portal/notifications/${notificationId}/read`, {
       method: 'POST',
