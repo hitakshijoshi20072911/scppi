@@ -17,6 +17,7 @@ import {
 } from '../../modules/reconciliation/state-machine.js'
 import { authenticate, requireContext, setDbContext } from '../../modules/core.js'
 import { GithubAdapter } from '../../providers/github/adapter.js'
+import { resolveDirectAuthUrl } from '../../swytchcode/direct-connect.js'
 import { unavailableExecutor, type SwytchcodeExecutor } from '../../swytchcode/executor.js'
 const uuid = z.string().uuid()
 const paramsSchema = z.object({ workspaceId: uuid, projectId: uuid }).strict()
@@ -272,7 +273,10 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
           async (tx) =>
             tx`insert into audit_event (workspace_id, actor_user_id, action, entity_type, entity_id, after_data, request_id) values (${workspaceId}, ${auth.userId}, 'source.connection_initiated', 'source_connection', ${source.id}, ${JSON.stringify({ provider: source.provider, repository: `${source.repository_owner}/${source.repository_name}` })}, ${safeCorrelationId(request)})`,
         )
-        return ok(reply, { url: result.url, expiresInSeconds: 600 })
+        const directUrl = await resolveDirectAuthUrl(result.url, source.provider).catch(
+          () => undefined,
+        )
+        return ok(reply, { url: directUrl ?? result.url, expiresInSeconds: 600 })
       } catch {
         fail(503, 'SWYTCHCODE_CONNECTION_FAILED', 'GitHub connection could not be started')
       }
@@ -387,7 +391,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
         const stored = []
         for (const rule of body.rules) {
           const [row] =
-            await tx`insert into scope_rule (workspace_id, project_id, contract_id, category, keywords, created_by) values (${workspaceId}, ${projectId}, ${contract.id}, ${rule.category}, ${JSON.stringify(rule.keywords)}::jsonb, ${auth.userId}) returning id, category, keywords, enabled`
+            await tx`insert into scope_rule (workspace_id, project_id, contract_id, category, keywords, created_by) values (${workspaceId}, ${projectId}, ${contract.id}, ${rule.category}, ${tx.json(rule.keywords)}, ${auth.userId}) returning id, category, keywords, enabled`
           stored.push(row)
         }
         await tx`insert into audit_event (workspace_id, actor_user_id, action, entity_type, entity_id, after_data, request_id) values (${workspaceId}, ${auth.userId}, 'scope_rules.replaced', 'project', ${projectId}, ${JSON.stringify({ count: stored.length, contractId: contract.id })}, ${safeCorrelationId(request)})`
@@ -433,7 +437,7 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
         keywords: Array.isArray(rule.keywords) ? rule.keywords : [],
       }))
       const [run] =
-        await tx`insert into billing_run (workspace_id, project_id, contract_id, period_start, period_end, time_zone, scope_rules_snapshot, status, completeness, version, created_by) values (${workspaceId}, ${projectId}, ${contract.id}, ${body.periodStart}, ${body.periodEnd}, ${project.time_zone}, ${JSON.stringify(rulesSnapshot)}::jsonb, 'created', 'unknown', 0, ${auth.userId}) returning id, project_id, contract_id, period_start, period_end, time_zone, status, completeness, version, created_at`
+        await tx`insert into billing_run (workspace_id, project_id, contract_id, period_start, period_end, time_zone, scope_rules_snapshot, status, completeness, version, created_by) values (${workspaceId}, ${projectId}, ${contract.id}, ${body.periodStart}, ${body.periodEnd}, ${project.time_zone}, ${tx.json(rulesSnapshot)}, 'created', 'unknown', 0, ${auth.userId}) returning id, project_id, contract_id, period_start, period_end, time_zone, status, completeness, version, created_at`
       await tx`insert into audit_event (workspace_id, actor_user_id, action, entity_type, entity_id, after_data, request_id) values (${workspaceId}, ${auth.userId}, 'reconciliation.created', 'billing_run', ${run.id}, ${JSON.stringify(run)}, ${safeCorrelationId(request)})`
       return run
     })
@@ -528,14 +532,10 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
         transitionError(error)
       }
 
-      const start = localDateToUtc(
-        String(snapshot.run.period_start).slice(0, 10),
-        snapshot.run.time_zone,
-      )
-      const end = localDateToUtc(
-        String(snapshot.run.period_end).slice(0, 10),
-        snapshot.run.time_zone,
-      )
+      const isoDate = (value: unknown) =>
+        (value instanceof Date ? value.toISOString() : String(value)).slice(0, 10)
+      const start = localDateToUtc(isoDate(snapshot.run.period_start), snapshot.run.time_zone)
+      const end = localDateToUtc(isoDate(snapshot.run.period_end), snapshot.run.time_zone)
       let successfulSources = 0
       let failedSources = 0
       let itemsImported = 0

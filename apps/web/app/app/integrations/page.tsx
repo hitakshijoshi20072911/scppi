@@ -14,6 +14,8 @@ export default function IntegrationsPage() {
   const { activeWorkspace } = useAuth()
   const [projects, setProjects] = useState<RecordRow[]>([])
   const [sources, setSources] = useState<RecordRow[]>([])
+  const [integrations, setIntegrations] = useState<RecordRow[]>([])
+  const [stripeKey, setStripeKey] = useState('')
   const [projectId, setProjectId] = useState('')
   const [owner, setOwner] = useState('')
   const [repo, setRepo] = useState('')
@@ -31,6 +33,8 @@ export default function IntegrationsPage() {
         if (requestedProject && rows.some((project) => String(project.id) === requestedProject))
           setProjectId(requestedProject)
         const all = await Promise.all(rows.map((project) => api.sources(String(project.id))))
+        const providerRows = await api.integrations()
+        setIntegrations(providerRows)
         setSources(
           all.flatMap((projectSources, index) =>
             projectSources.map((source) => ({
@@ -121,6 +125,52 @@ export default function IntegrationsPage() {
     } catch (cause) {
       setRetryAction({ source, action: 'disconnect' })
       setError(cause instanceof Error ? cause.message : 'GitHub connection could not be revoked.')
+    } finally {
+      setPending(false)
+    }
+  }
+  const stripeConnection = integrations.find((row) => row.provider === 'stripe')
+  const stripeConnected = stripeConnection?.status === 'connected'
+  async function connectStripe() {
+    if (!activeWorkspace || !stripeKey.trim()) return
+    setPending(true)
+    setError(null)
+    setRetryAction(null)
+    try {
+      await workspaceApi(activeWorkspace.id).connectStripe(stripeKey.trim())
+      setStripeKey('')
+      load()
+    } catch (cause) {
+      setRetryAction(null)
+      setError(cause instanceof Error ? cause.message : 'Stripe connection could not be verified.')
+    } finally {
+      setPending(false)
+    }
+  }
+  async function verifyStripe() {
+    if (!activeWorkspace) return
+    setPending(true)
+    setError(null)
+    setRetryAction(null)
+    try {
+      await workspaceApi(activeWorkspace.id).verifyStripe()
+      load()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Stripe access could not be verified.')
+    } finally {
+      setPending(false)
+    }
+  }
+  async function disconnectStripe() {
+    if (!activeWorkspace) return
+    setPending(true)
+    setError(null)
+    setRetryAction(null)
+    try {
+      await workspaceApi(activeWorkspace.id).disconnectStripe()
+      load()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Stripe connection could not be revoked.')
     } finally {
       setPending(false)
     }
@@ -238,24 +288,57 @@ export default function IntegrationsPage() {
           </form>
         </article>
         <article className="panel panel-quiet">
-          <p className="eyebrow">Stripe / test-mode drafts</p>
-          <h2>Setup required.</h2>
+          <div className="integration-heading">
+            <span className="integration-icon">ST</span>
+            <div>
+              <p className="eyebrow">Stripe / test mode only</p>
+              <h2>Test account</h2>
+            </div>
+            <span className="record-status">{stripeConnected ? 'Connected' : 'Not connected'}</span>
+          </div>
           <p className="panel-copy">
-            VendorProof will only create an approved test-mode draft. The Swytchcode Stripe methods
-            and API route are deliberately disabled until a test credential is verified and
-            idempotent recovery is implemented.
+            VendorProof only creates approved test-mode drafts. Enter a Stripe test secret key
+            (sk_test_…) — it is sent once to the server, stored by Swytchcode, and never kept in
+            this browser.
           </p>
-          <span className="status-badge">Not connected · not verified</span>
+          {stripeConnection?.last_verified_at ? (
+            <p className="panel-copy">
+              Last verified: {new Date(String(stripeConnection.last_verified_at)).toLocaleString()}
+            </p>
+          ) : null}
+          {stripeConnected ? (
+            <div className="record-actions">
+              <button className="button button-ghost" disabled={pending} onClick={verifyStripe}>
+                Re-verify access
+              </button>
+              <button className="button button-ghost" disabled={pending} onClick={disconnectStripe}>
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <form
+              className="inline-form"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void connectStripe()
+              }}
+            >
+              <input
+                required
+                type="password"
+                autoComplete="off"
+                placeholder="sk_test_…"
+                value={stripeKey}
+                onChange={(event) => setStripeKey(event.target.value)}
+              />
+              <button className="button button-dark" disabled={pending || !stripeKey.trim()}>
+                {pending ? 'Verifying…' : 'Connect Stripe test account'}
+              </button>
+            </form>
+          )}
           <p className="coming-soon">
-            No live or financial action is available from this workspace.
+            No live keys, charges, refunds or invoice sending are available from this workspace.
           </p>
-          <button className="button button-ghost" disabled aria-describedby="stripe-setup-note">
-            Connect Stripe test account
-          </button>
-          <small id="stripe-setup-note" className="provider-setup-note">
-            Connect remains unavailable until server-side test-mode verification and a safe
-            draft-only API path are complete.
-          </small>
         </article>
         <article className="panel panel-quiet">
           <p className="eyebrow">Google Calendar / reminders</p>

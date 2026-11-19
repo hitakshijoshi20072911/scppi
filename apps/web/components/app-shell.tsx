@@ -14,6 +14,7 @@ const navigation = [
   { href: '/app/evidence', label: 'Evidence & runs', icon: '↗' },
   { href: '/app/invoices', label: 'Invoice review', icon: '▤' },
   { href: '/app/integrations', label: 'Integrations', icon: '◎' },
+  { href: '/portal', label: 'Client portal', icon: '◈' },
   { href: '/app/settings', label: 'Workspace settings', icon: '⊙' },
 ]
 

@@ -267,7 +267,7 @@ export async function phase3Routes(app: FastifyInstance) {
           const preview = domainPreview(input)
           const [invoice] = await tx`
           insert into invoice_preview (workspace_id, project_id, contract_id, billing_run_id, period_start, period_end, currency, subtotal_minor, content_hash, snapshot, created_by)
-          values (${workspaceId}, ${projectId}, ${input.contractId}, ${runId}, ${input.periodStart}, ${input.periodEnd}, ${input.currency}, ${preview.subtotalMinor}, ${preview.contentHash}, ${JSON.stringify(preview)}::jsonb, ${auth.userId})
+          values (${workspaceId}, ${projectId}, ${input.contractId}, ${runId}, ${input.periodStart}, ${input.periodEnd}, ${input.currency}, ${preview.subtotalMinor}, ${preview.contentHash}, ${tx.json(preview)}, ${auth.userId})
           returning id, status, version, period_start, period_end, currency, subtotal_minor, content_hash, snapshot, created_at
         `
           for (const line of preview.lines) {

@@ -88,21 +88,37 @@ export function getCookie(request: FastifyRequest, name: string) {
     .find((x) => x.startsWith(`${name}=`))
     ?.slice(name.length + 1)
 }
+
+export function sessionCookieName(nodeEnv = config.NODE_ENV) {
+  return nodeEnv === 'production' || nodeEnv === 'staging'
+    ? '__Host-vendorproof_session'
+    : 'vendorproof_session'
+}
+
+function sessionCookieAttributes() {
+  const hosted = config.NODE_ENV === 'production' || config.NODE_ENV === 'staging'
+  return {
+    name: sessionCookieName(),
+    sameSite: hosted ? 'None' : 'Lax',
+    secure: hosted,
+  } as const
+}
+
 export function setSessionCookie(
   reply: { header: (name: string, value: string) => unknown },
   token: string,
 ) {
-  const crossOrigin = config.NODE_ENV === 'production'
+  const cookie = sessionCookieAttributes()
   reply.header(
     'set-cookie',
-    `__Host-vendorproof_session=${token}; Path=/; HttpOnly; SameSite=${crossOrigin ? 'None' : 'Lax'}${crossOrigin ? '; Secure' : ''}`,
+    `${cookie.name}=${token}; Path=/; HttpOnly; SameSite=${cookie.sameSite}${cookie.secure ? '; Secure' : ''}`,
   )
 }
 export function clearSessionCookie(reply: { header: (name: string, value: string) => unknown }) {
-  const crossOrigin = config.NODE_ENV === 'production'
+  const cookie = sessionCookieAttributes()
   reply.header(
     'set-cookie',
-    `__Host-vendorproof_session=; Path=/; HttpOnly; Max-Age=0; SameSite=${crossOrigin ? 'None' : 'Lax'}${crossOrigin ? '; Secure' : ''}`,
+    `${cookie.name}=; Path=/; HttpOnly; Max-Age=0; SameSite=${cookie.sameSite}${cookie.secure ? '; Secure' : ''}`,
   )
 }
 export async function createSession(userId: string) {
@@ -121,7 +137,7 @@ export async function createSession(userId: string) {
   }
 }
 export async function authenticate(request: FastifyRequest): Promise<AuthContext | undefined> {
-  const token = getCookie(request, '__Host-vendorproof_session')
+  const token = getCookie(request, sessionCookieName())
   if (!token) return undefined
   const tokenHash = hashToken(token)
   const [row] = await withDbContext({ sessionTokenHash: tokenHash }, async (tx) => {

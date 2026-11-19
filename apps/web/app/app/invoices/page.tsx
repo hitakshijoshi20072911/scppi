@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/components/auth-provider'
-import { invoiceApi, RecordRow } from '@/lib/api'
+import { invoiceApi, providerPortalApi, RecordRow } from '@/lib/api'
 
 const value = (row: RecordRow, key: string) => String(row[key] ?? '')
 const date = (input: unknown) => {
@@ -75,6 +75,7 @@ export default function InvoicesPage() {
   const [selected, setSelected] = useState<RecordRow | null>(null)
   const [lines, setLines] = useState<RecordRow[]>([])
   const [reviews, setReviews] = useState<RecordRow[]>([])
+  const [clientInvoices, setClientInvoices] = useState<RecordRow[]>([])
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(true)
   const [pending, setPending] = useState(false)
@@ -101,6 +102,7 @@ export default function InvoicesPage() {
       setLines([])
       setReviews([])
       void load(activeWorkspace.id)
+      void loadClientInvoices()
     }
   }, [activeWorkspace?.id])
 
@@ -137,6 +139,29 @@ export default function InvoicesPage() {
     }
   }
 
+  async function issueToClient() {
+    if (!activeWorkspace || !selected) return
+    setPending(true)
+    setError(null)
+    try {
+      await providerPortalApi(activeWorkspace.id).issueInvoice(String(selected.id))
+      await loadClientInvoices()
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Invoice could not be issued to the client.',
+      )
+    } finally {
+      setPending(false)
+    }
+  }
+  async function loadClientInvoices() {
+    if (!activeWorkspace) return
+    try {
+      setClientInvoices(await providerPortalApi(activeWorkspace.id).clientInvoices())
+    } catch {
+      setClientInvoices([])
+    }
+  }
   async function review(decision: 'approve' | 'reject') {
     if (!activeWorkspace || !selected) return
     if (decision === 'reject' && reason.trim().length < 3) {
@@ -243,6 +268,30 @@ export default function InvoicesPage() {
             )}
           </div>
         </article>
+        <article className="panel panel-large">
+          <p className="eyebrow">Client billing</p>
+          <h2>Issued client invoices</h2>
+          <div className="record-table">
+            {clientInvoices.length ? (
+              clientInvoices.map((inv) => (
+                <div className="record-row" key={String(inv.id)}>
+                  <div>
+                    <strong>{String(inv.invoice_number)}</strong>
+                    <small>
+                      {money(inv.total_minor, inv.currency)} ·{' '}
+                      {inv.client_name ? String(inv.client_name) : ''}
+                    </small>
+                  </div>
+                  <span className="record-status">{String(inv.status)}</span>
+                </div>
+              ))
+            ) : (
+              <p className="panel-copy">
+                No client invoices issued yet. Approve a preview, then use "Issue to client portal".
+              </p>
+            )}
+          </div>
+        </article>
         <article className="panel panel-quiet">
           <p className="eyebrow">Financial safety</p>
           <h2>Review only. No Stripe writes.</h2>
@@ -334,6 +383,15 @@ export default function InvoicesPage() {
                 >
                   Reject with reason
                 </button>
+                {String(selected.status) === 'approved' && (
+                  <button
+                    className="button button-dark"
+                    disabled={pending}
+                    onClick={() => void issueToClient()}
+                  >
+                    Issue to client portal
+                  </button>
+                )}
               </div>
               <p className="panel-copy">
                 Approving authorizes review only; this implementation does not create, finalize, or

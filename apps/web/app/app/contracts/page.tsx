@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { FormEvent, useEffect, useState } from 'react'
 import { useAuth } from '@/components/auth-provider'
-import { RecordRow, workspaceApi } from '@/lib/api'
+import { RecordRow, workspaceApi, providerPortalApi } from '@/lib/api'
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -67,6 +67,26 @@ export default function ContractsPage() {
       setPending(false)
     }
   }
+  async function portalAction(contract: RecordRow, action: 'propose' | 'accept') {
+    if (!activeWorkspace) return
+    setError(null)
+    try {
+      const api = providerPortalApi(activeWorkspace.id)
+      const contractId = String(contract.id)
+      let versions = await api.contractVersions(contractId)
+      if (action === 'propose' || !versions.length) {
+        const reason = window.prompt('Change reason (optional for first version)') ?? undefined
+        await api.createContractVersion(contractId, reason ? { changeReason: reason } : {})
+        versions = await api.contractVersions(contractId)
+      }
+      const pending = versions.find((v) => !['accepted', 'rejected'].includes(String(v.status)))
+      if (action === 'accept' && pending)
+        await api.providerAcceptVersion(contractId, String(pending.id))
+      load()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Contract portal action failed.')
+    }
+  }
   async function activate(id: string) {
     if (!activeWorkspace) return
     setError(null)
@@ -122,6 +142,12 @@ export default function ContractsPage() {
                 </div>
                 <div className="record-actions">
                   <span className="record-status">{String(contract.status ?? 'draft')}</span>
+                  <button className="text-button" onClick={() => portalAction(contract, 'propose')}>
+                    Propose version
+                  </button>
+                  <button className="text-button" onClick={() => portalAction(contract, 'accept')}>
+                    Accept version
+                  </button>
                   {contract.status === 'draft' && (
                     <>
                       <button className="text-button" onClick={() => activate(String(contract.id))}>

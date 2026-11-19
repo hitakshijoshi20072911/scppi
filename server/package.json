@@ -6,7 +6,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch src/dev.ts",
     "dev:api": "tsx watch src/api/index.ts",
     "dev:worker": "tsx watch src/worker/index.ts",
     "build": "tsc -p tsconfig.build.json",
@@ -17,6 +17,7 @@
     "lint": "eslint src --ext .ts",
     "test": "vitest",
     "test:unit": "vitest run",
+    "test:integration": "vitest run tests/integration",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:check": "drizzle-kit check --config drizzle.config.ts"

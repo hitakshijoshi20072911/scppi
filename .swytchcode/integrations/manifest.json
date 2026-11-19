@@ -1,7 +1,7 @@
 {
   "GitHub.github@1.1.4": {
     "version": "1.1.4",
-    "sandbox_endpoint": "",
+    "sandbox_endpoint": "https://api.github.com",
     "production_endpoint": "https://api.github.com",
     "methods": 1204,
     "auth": {
@@ -91,7 +91,7 @@
   },
   "Stripe.stripe@2026-06-24.dahlia": {
     "version": "2026-06-24.dahlia",
-    "sandbox_endpoint": "",
+    "sandbox_endpoint": "https://api.stripe.com",
     "production_endpoint": "https://api.stripe.com/",
     "methods": 587,
     "auth": {

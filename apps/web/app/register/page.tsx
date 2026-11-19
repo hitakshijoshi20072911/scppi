@@ -9,7 +9,13 @@ import { VendorProofApiError } from '@/lib/api'
 export default function RegisterPage() {
   const router = useRouter()
   const { register } = useAuth()
-  const [form, setForm] = useState({ name: '', email: '', password: '', workspaceName: '' })
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    workspaceName: '',
+    accountType: 'provider' as 'provider' | 'client' | 'both',
+  })
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
@@ -19,7 +25,7 @@ export default function RegisterPage() {
     setError(null)
     try {
       await register({ ...form, workspaceName: form.workspaceName || undefined })
-      router.replace('/app')
+      router.replace(form.accountType === 'client' ? '/portal' : '/app')
     } catch (cause) {
       setError(
         cause instanceof VendorProofApiError && cause.code === 'DUPLICATE_EMAIL'
@@ -81,6 +87,29 @@ export default function RegisterPage() {
               autoComplete="email"
             />
           </label>
+          <fieldset className="form-stack" style={{ border: 'none', padding: 0, margin: 0 }}>
+            <legend className="eyebrow" style={{ padding: 0 }}>
+              I am joining as
+            </legend>
+            <div className="record-actions" role="radiogroup" aria-label="Account type">
+              {(['provider', 'client', 'both'] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  className={
+                    form.accountType === type ? 'button button-dark' : 'button button-ghost'
+                  }
+                  onClick={() => setForm({ ...form, accountType: type })}
+                >
+                  {type === 'provider'
+                    ? 'Service provider'
+                    : type === 'client'
+                      ? 'Client / hiring'
+                      : 'Both'}
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <label>
             Workspace name <span className="optional">optional</span>
             <input

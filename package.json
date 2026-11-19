@@ -24,6 +24,7 @@
     "format:check": "prettier --check \"server/src/**/*.{ts,tsx}\" \"server/tests/**/*.{ts,tsx}\" \"apps/web/**/*.{ts,tsx,css,json}\" \"packages/shared/**/*.{ts,tsx}\"",
     "test": "npm run test:unit",
     "test:unit": "npm run test:unit --workspace=@vendorproof/server",
+    "test:integration": "npm run test:integration --workspace=@vendorproof/server",
     "test:e2e": "npm run test:e2e --workspace=@vendorproof/web",
     "db:generate": "npm run db:generate --workspace=@vendorproof/server",
     "db:migrate": "npm run db:migrate --workspace=@vendorproof/server",

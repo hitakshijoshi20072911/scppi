@@ -79,6 +79,45 @@ export async function apiRequest<T>(
     | undefined
   if (payload?.csrfToken) csrfToken = payload.csrfToken
   if (response.status === 401) notifySessionExpiry()
+  if (payload?.code === 'CSRF_INVALID' && !options.signal?.aborted) {
+    try {
+      const session = await apiRequest<Session>('/api/v1/auth/me', { method: 'GET' })
+      if (session?.csrfToken) {
+        csrfToken = session.csrfToken
+        headers.set('x-csrf-token', csrfToken)
+        const retryResponse = await fetch(requestUrl, {
+          ...requestOptions,
+          method,
+          headers,
+          credentials: 'include',
+          body: options.body === undefined ? undefined : JSON.stringify(options.body),
+          cache: 'no-store',
+        })
+        readCsrfHeader(retryResponse)
+        const retryPayload = (await retryResponse.json().catch(() => undefined)) as
+          | (ApiEnvelope<T> & {
+              code?: string
+              message?: string
+              requestId?: string
+              csrfToken?: string
+            })
+          | undefined
+        if (retryPayload?.csrfToken) csrfToken = retryPayload.csrfToken
+        if (!retryResponse.ok)
+          throw new VendorProofApiError(
+            retryPayload?.message ?? 'The request could not be completed.',
+            {
+              code: retryPayload?.code,
+              requestId: retryPayload?.requestId,
+              status: retryResponse.status,
+            },
+          )
+        return retryPayload && 'data' in retryPayload ? retryPayload.data : (retryPayload as T)
+      }
+    } catch (cause) {
+      if (cause instanceof VendorProofApiError) throw cause
+    }
+  }
   if (!response.ok)
     throw new VendorProofApiError(payload?.message ?? 'The request could not be completed.', {
       code: payload?.code,
@@ -229,6 +268,23 @@ export function workspaceApi(workspaceId: string) {
         `/api/v1/workspaces/${workspaceId}/projects/${projectId}/sources/${sourceId}/disconnect`,
         { method: 'POST', retry: false },
       ),
+    integrations: () => apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/integrations`),
+    connectStripe: (apiKey: string) =>
+      apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/integrations/stripe/connect`, {
+        method: 'POST',
+        body: { apiKey },
+        retry: false,
+      }),
+    verifyStripe: () =>
+      apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/integrations/stripe/verify`, {
+        method: 'POST',
+        retry: false,
+      }),
+    disconnectStripe: () =>
+      apiRequest<{ disconnected: boolean }>(
+        `/api/v1/workspaces/${workspaceId}/integrations/stripe/disconnect`,
+        { method: 'POST', retry: false },
+      ),
     runs: {
       list: (projectId: string) =>
         apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/runs`),
@@ -281,6 +337,113 @@ export function workspaceApi(workspaceId: string) {
       apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/activity`),
   }
 }
+
+export const portalApi = {
+  acceptInvitation: (token: string) =>
+    apiRequest<{ workspaceId: string; clientId: string; role: string }>(
+      '/api/v1/portal/invitations/accept',
+      { method: 'POST', body: { token }, retry: false },
+    ),
+  overview: () => apiRequest<{ userId: string; contexts: RecordRow[] }>('/api/v1/portal/overview'),
+  contractDecision: (versionId: string, decision: string, reason?: string) =>
+    apiRequest<{ decision: string }>(`/api/v1/portal/contract-versions/${versionId}/decision`, {
+      method: 'POST',
+      body: { decision, reason },
+      retry: false,
+    }),
+  deliverableDecision: (deliverableId: string, decision: string, reason?: string) =>
+    apiRequest<{ decision: string }>(`/api/v1/portal/deliverables/${deliverableId}/decision`, {
+      method: 'POST',
+      body: { decision, reason },
+      retry: false,
+    }),
+  invoice: (invoiceId: string) => apiRequest<RecordRow>(`/api/v1/portal/invoices/${invoiceId}`),
+  checkoutInvoice: (invoiceId: string) =>
+    apiRequest<{ url: string; sessionId: string }>(
+      `/api/v1/portal/invoices/${invoiceId}/checkout`,
+      {
+        method: 'POST',
+        retry: false,
+      },
+    ),
+  verifyInvoicePayment: (invoiceId: string) =>
+    apiRequest<{ status: string }>(`/api/v1/portal/invoices/${invoiceId}/verify-payment`, {
+      method: 'POST',
+      retry: false,
+    }),
+  markNotificationRead: (notificationId: string) =>
+    apiRequest<{ read: boolean }>(`/api/v1/portal/notifications/${notificationId}/read`, {
+      method: 'POST',
+      retry: false,
+    }),
+}
+
+export const providerPortalApi = (workspaceId: string) => ({
+  inviteClient: (clientId: string, email: string, role: string) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/clients/${clientId}/invitations`, {
+      method: 'POST',
+      body: { email, role },
+      retry: false,
+    }),
+  clientInvitations: (clientId: string) =>
+    apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/clients/${clientId}/invitations`),
+  clientPortal: (clientId: string) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/clients/${clientId}/portal`),
+  revokeInvitation: (clientId: string, invitationId: string) =>
+    apiRequest<{ revoked: boolean }>(
+      `/api/v1/workspaces/${workspaceId}/clients/${clientId}/invitations/${invitationId}/revoke`,
+      { method: 'POST', retry: false },
+    ),
+  createEngagement: (body: Record<string, unknown>) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/engagements`, {
+      method: 'POST',
+      body,
+      retry: false,
+    }),
+  engagements: () => apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/engagements`),
+  contractVersions: (contractId: string) =>
+    apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/contracts/${contractId}/versions`),
+  createContractVersion: (contractId: string, body: Record<string, unknown>) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/contracts/${contractId}/versions`, {
+      method: 'POST',
+      body,
+      retry: false,
+    }),
+  providerAcceptVersion: (contractId: string, versionId: string) =>
+    apiRequest<{ accepted: boolean }>(
+      `/api/v1/workspaces/${workspaceId}/contracts/${contractId}/versions/${versionId}/provider-accept`,
+      { method: 'POST', retry: false },
+    ),
+  createDeliverable: (body: Record<string, unknown>) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/deliverables`, {
+      method: 'POST',
+      body,
+      retry: false,
+    }),
+  projectDeliverables: (projectId: string) =>
+    apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/deliverables`),
+  submitDeliverable: (deliverableId: string) =>
+    apiRequest<{ submitted: boolean }>(
+      `/api/v1/workspaces/${workspaceId}/deliverables/${deliverableId}/submit`,
+      {
+        method: 'POST',
+        retry: false,
+      },
+    ),
+  projectLifecycle: (projectId: string, event: string, reason?: string) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/lifecycle`, {
+      method: 'POST',
+      body: { event, reason },
+      retry: false,
+    }),
+  issueInvoice: (previewId: string) =>
+    apiRequest<RecordRow>(`/api/v1/workspaces/${workspaceId}/invoice-previews/${previewId}/issue`, {
+      method: 'POST',
+      retry: false,
+    }),
+  clientInvoices: () =>
+    apiRequest<RecordRow[]>(`/api/v1/workspaces/${workspaceId}/client-invoices`),
+})
 
 export const invoiceApi = (workspaceId: string) => ({
   eligibleRuns: () =>

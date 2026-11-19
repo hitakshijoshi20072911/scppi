@@ -102,3 +102,102 @@ Resolution status: local source checks pass; hosted migration, recoverable logic
 - No hosted database, provider account, Render/Vercel configuration, migration, paid resource, financial action, or production deployment was changed. The existing Vercel Preview still has no branch-specific isolated API/database configuration; do not treat it as an authenticated product preview.
 
 Resolution status: local feature implementation complete pending final verification and PR update; hosted Preview isolation, backups/credential rotation, migrations/RLS integration test, and live provider authentication remain blocked.
+
+## Core repair and Windows readiness — 2026-11-17
+
+- **Repository/branch:** Fetched `origin/main` at `3ca8a9a2e4cc0f6848791aec5f04c06f23e865e7` and created `feat/vendorproof-local-and-core-repair`.
+- **Confirmed issues:** `docker-compose.yml` bound VendorProof to host port `5432`; `render.yaml` exposed `DATABASE_URL` even though hosted runtime code requires `APP_DATABASE_URL`; local session responses attempted to use the `__Host-` cookie name without `Secure`; and no PostgreSQL integration-test command or Windows setup/check scripts existed.
+- **Fixes:** Compose now binds only `127.0.0.1:5433`; Render uses `APP_DATABASE_URL`; local development uses `vendorproof_session` with `SameSite=Lax`, while staging/production retain `__Host-vendorproof_session`, `Secure`, `HttpOnly`, and `Path=/`; added idempotent `scripts/dev/setup.ps1`, `scripts/dev/check.ps1`, `docs/LOCAL_SETUP_WINDOWS.md`, and PostgreSQL integration coverage for sessions, CRUD, approvals, two-workspace isolation, and restricted-role RLS.
+- **Verification:** `npm ci` succeeded; format, lint, server/web typecheck, 80 unit tests, server/web production builds, `drizzle-kit check`, `npm audit --omit=dev --audit-level=high`, and `git diff --check` passed. `npm run test:integration` discovered the three integration tests but skipped them because this sandbox has no configured PostgreSQL URL; Docker is not installed here. No hosted database, production service, or other Docker project was touched.
+- **Minor friction:** The first quality run stopped on Prettier formatting for the new integration test. Running `npx prettier --write server/tests/integration/core.integration.test.ts` resolved it; all subsequent static/unit gates passed.
+
+## Repair Prompt 1 reproduction and follow-up — 2026-11-17
+
+The user's Windows reproduction exposed several confirmed local setup failures. A branch switch was blocked by an uncommitted `docker-compose.yml`, Node was `v22.19.0` while the repository requires `>=22.23.4 <23`, nvm was unavailable, the API and Next.js both attempted port 3000, the local database was unavailable on 5433, and the integration instructions targeted `vendorproof_integration` even though Compose creates only `vendorproof`. The user's checkout also reported missing setup/test scripts despite those files existing on the remote repair commit; the follow-up preserves the remote branch and does not overwrite local uncommitted files.
+
+The confirmed fixes are to pin the web dev command to port 3001, use loopback API host `127.0.0.1:3000`, fail fast with the official Node 22.23.4 MSI instructions, check the Docker engine rather than only the CLI, validate Compose before startup, wait for `pg_isready`, migrate the existing `vendorproof` database, verify the migration ledger, and use the restricted `vendorproof_app` role for integration execution. The setup scripts now print useful errors and container logs without printing credentials.
+
+The GSAP warnings had two confirmed source patterns in `landing-experience.tsx`: `.vp-case-track` had two independent ScrollTrigger owners, and `invalidateOnRefresh` was incorrectly placed in the GSAP tween vars as well as the ScrollTrigger vars. The follow-up removes the duplicate root-level track trigger, leaves ownership with `UseCases`, removes the invalid tween property, and keeps cleanup through `gsap.context`/`matchMedia`. Browser verification of the landing page had previously been blocked only by a missing Playwright browser binary; after installing Chromium, all seven existing Playwright tests passed. Windows PowerShell and Docker execution remain user-side checks because this sandbox has neither PowerShell nor Docker Desktop.
+
+## Repair Prompt 1 final hardening — 2026-11-17
+
+- **Confirmed follow-up issues:** the server integration script still used `--passWithNoTests`, the Windows verification script did not set the restricted local runtime URL before invoking integration tests, and all landing-page `gsap.context` calls passed React ref objects instead of mounted DOM elements.
+- **Fixes:** removed `--passWithNoTests`; `check.ps1` now runs the integration suite with the locally provisioned `vendorproof_app` role and `NODE_ENV=test`; all landing animation contexts now use `root.current`, while the existing single-owner ScrollTrigger and cleanup logic remains intact.
+- **Verification boundary:** repository checks and the browser suite can run in this sandbox after dependency installation, but PowerShell, Docker Desktop, and a real PostgreSQL-backed restricted-role test remain Windows-side acceptance checks. No hosted service or other local Docker project was modified.
+
+## PostgreSQL time-entry transition failure — 2026-11-18
+
+- **Actual Windows result:** the user confirmed Node `v22.23.4`, Docker PostgreSQL readiness on `127.0.0.1:5433`, six applied migrations, and restricted-role setup. Integration test 1 then returned HTTP `500` while submitting a draft time entry; milestone/isolation and tenant-context tests passed. The report did not include a sanitized response body or request ID, so neither is reproduced here.
+- **Confirmed root cause:** `transition()` always used `$3`, `$4`, and `$5` for workspace, entity, and previous status while passing `auth.userId` as `$2` even for transitions with no `$2` assignment. Draft time-entry submission therefore passed an unused parameter and produced a PostgreSQL parameter-inference failure.
+- **Fix:** transition assignments and parameter indexes are now built together. Submission sets `submitted_at = now()`; approval sets `reviewer_id` and `reviewed_at`; milestone actor timestamps retain their existing semantics. Workspace, entity, previous-status predicates, role checks, and parameterization remain enforced.
+- **Regression coverage:** the integration suite now checks submission metadata, duplicate submission rejection, draft approval rejection, rejected-entry resubmission, wrong-workspace non-modification, and sanitized response diagnostics containing only status, code, message, and request ID.
+- **Verification boundary:** formatting, lint, typecheck, 81 unit tests, and production builds pass. This sandbox has no Docker/PostgreSQL, so the corrected database-backed integration suite has not been claimed as passing here; the user must rerun it locally with `APP_DATABASE_URL` using `vendorproof_app`.
+
+## Final Prompt 1 local registration/check workflow — 2026-11-18
+
+- **Actual Windows result:** the user's repeated local integration run reached registration and returned `expected 201, received 409`; the attached report did not include the PostgreSQL constraint name or a sanitized response/request ID. The prior implementation translated every `23505` into `DUPLICATE_EMAIL`, so the real unique violation was hidden from the user.
+- **Confirmed design flaw:** workspace slugs were globally unique, but registration first performed an RLS-scoped existence query. A newly registered user could not see a same-slug workspace owned by another tenant, so the lookup could not protect the global constraint.
+- **Fix:** registration now derives a readable slug from the workspace name plus the new user's UUID prefix, truncated to the 80-character database limit. Only `app_user_email_key` maps to `DUPLICATE_EMAIL`; other unique violations retain their real error path while logging only the safe constraint name and request ID.
+- **Test improvements:** integration emails use `randomUUID()`, workspace slugs are asserted unique, and the existing RLS/time-entry transition coverage remains in place so the suite can be run repeatedly against the same database without cleanup.
+- **Formatting/check workflow:** the five reported CSS files were run through Prettier and were unchanged in this checkout; `format:check` passes. `check.ps1` now runs database/repository checks and integration tests before HTTP health checks, and reports an actionable API-start message when port 3000 is not listening. The API remains on port 3000, frontend on 3001, and fresh `apps/web/.env.local` uses `http://localhost:3000`.
+- **Verification boundary:** this sandbox passes the non-database checks but has no Docker/PostgreSQL. The actual violated constraint name and consecutive database-backed integration results must be confirmed on the user's Windows database run; they are not fabricated here.
+
+## Final local verification cleanup — 2026-11-18
+
+- **Windows result from the attached report:** PostgreSQL integration passed 3/3 against the existing six-migration database; lint, typecheck, and production build passed. The remaining unit failure was caused by `APP_DATABASE_URL` inherited by `check.ps1`, making the health test observe `ready` instead of its intended isolated `not_configured` state.
+- **Environment correction:** `setup.ps1` now persists the restricted `APP_DATABASE_URL` in `.env` while retaining migration-owner `DATABASE_URL`. The runtime already prefers `APP_DATABASE_URL`; migrations continue using `DATABASE_URL`.
+- **Health/check correction:** health tests mock only `checkDatabase` and cover both `not_configured` and `ready` without weakening production readiness semantics. `check.ps1` temporarily clears database URLs for unit tests, supplies `APP_DATABASE_URL` only to integration tests, restores the original environment, checks every npm exit code immediately, and supports `-SkipHttpChecks`.
+- **HTTP diagnostics:** connection refusal reports that the API is not running; a live API returning HTTP 503 from `/health/ready` reports that the API is running but database readiness failed and includes the sanitized readiness JSON.
+- **CSS:** the five reported CSS files were run through Prettier and were already clean in this checkout, so no unrelated CSS diff was introduced.
+- **Verification boundary:** the attached report supplies the actual Windows 3/3 integration result. This sandbox independently passes format, lint, typecheck, 82 unit tests, integration discovery, and production build; it has no Docker/PostgreSQL for a second live database run.
+
+## Windows migration path correction — 2026-11-17
+
+- **Reproduction:** after Node `v22.23.4`, Docker Desktop, PostgreSQL readiness on `127.0.0.1:5433`, and `npm ci` succeeded, the Windows migration command failed with `ENOENT: no such file or directory, scandir 'C:\C:\swytchcode\server\src\db\migrations'`.
+- **Root cause:** `server/src/db/migrate.ts` used `new URL('./migrations', import.meta.url).pathname`. A URL pathname is not guaranteed to be a native Windows filesystem path, so the drive-letter path was interpreted with an extra `C:` prefix.
+- **Fix:** migration discovery now uses `fileURLToPath(new URL('./migrations/', import.meta.url))`; existing `join()` file reads and SQL migrations were left unchanged. Added `server/tests/migration-path.test.ts`, which resolves the real directory from module URLs and verifies all six SQL migrations are discovered.
+- **Verification:** the attached Windows report confirms the malformed-path failure and the preceding setup/readiness stages. This sandbox has no Windows PowerShell or Docker Desktop, so a post-fix Windows migration run, ledger count, and second idempotent run are not claimed here. The new path regression test and Linux static/test checks must pass before the commit is pushed.
+
+## Swytchcode tenant OAuth + provider envelope fix — 2026-11-18
+
+- **GitHub tenant connect:** `swy auth connect github --tenant <workspace>` opens `auth.swytchcode.com`, a buggy Vite/StrictMode build that exchanges the single-use state token twice and always shows "This link has already been used". The `\u0026` JSON escaping in `--json` output also breaks hand-copied links (page falls back to `http://localhost:8081`). Workaround used: replicate the widget flow manually — exchange state once via `POST /v3/cli/connected-accounts/session`, call `/_widgets/DataIntegrations/github/authorize`, complete OAuth, then `POST /v3/cli/connected-accounts/confirm` with `pipes_slug: github`. New authorize links expire within ~2 minutes.
+- **Executor envelope bug (fixed):** `@swytchcode/runtime` `exec()` resolves to `{data, request, status_code}`, not the raw provider payload. `createSwytchcodeRuntimeTransport` returned the envelope, so `GithubAdapter` schema validation failed with `INVALID_PROVIDER_RESPONSE` → HTTP 409 `GITHUB_VERIFICATION_FAILED` even though `provider_execution` recorded `succeeded`. Transport now unwraps `.data` and JSON-parses string payloads.
+- **Stripe connect:** implemented `POST /api/v1/workspaces/:id/integrations/stripe/connect|verify|disconnect` + `GET .../integrations` backed by migration `0006_provider_connections` (RLS-enabled). Key is validated as `sk_test_`, saved via runtime `saveKey`, then verified with bounded `stripe.customer.list` (`limit: 1`) before `status='connected'`. GET initially returned `[]` because `withDbContext` lacked `userId`, so `vendorproof_is_active_workspace_member` failed under RLS — fixed.
+- **Verification:** real GitHub `pull.get`/`pull.commits.get` and Stripe `customer.list` reads succeeded through the workspace tenant on 2026-11-18.
+
+## Two-sided platform + Stripe checkout — 2026-11-18
+
+- **RLS on client writes:** client-portal mutations initially failed — `audit_event` and provider tables only have workspace-member policies. Fixed with SECURITY DEFINER functions (`0008`) for invitation acceptance and client contract/deliverable decisions; client billing writes record to `client_invoice_event` only.
+- **Portal overview joins:** joining client/workspace tables under a context without `app.workspace_id` returned empty; fixed by iterating memberships and querying per-workspace.
+- **Stripe checkout schema:** `stripe.session.create1` requires `line_items` as an index-keyed object (`{"0": {...}}`), rejects array form; `payment_method_types` is deprecated by Stripe — removed. Real checkout session created successfully in test mode.
+- **Payment truth:** invoices are marked paid only after `stripe.session.get` reports `payment_status=paid`; the browser redirect is never trusted.
+
+## Two-sided registration + provider UI — 2026-11-19
+
+- **Registration intent:** added `app_user.signup_intent` (migration 0009) with provider/client/both choice at signup; client signups route to `/portal`, providers to `/app`; login routes portal members to `/portal`.
+- **Provider UI gaps closed:** contracts page gained propose/accept-version actions; invoices page gained issue-to-client + issued list; project detail gained deliverable create/submit and share-with-client.
+- **Known limitation:** client-only signup still creates a personal workspace (required by the auth/workspace model); it is never exposed as a provider dashboard unless the user has provider memberships.
+
+## Supabase backup + migration rehearsal — 2026-11-19
+
+- **CLI auth:** `supabase login` browser flow stored token under user profile; projects list confirmed 2 VendorProof projects (test `opffskvpzppozdpjahze` ap-south-1, staging `lmvxfopnczeuxgxugoxe` ap-southeast-1), both Free/ACTIVE_HEALTHY/PG 17.11.
+- **Backups:** 3 dumps per project (schema, --data-only, --role-only) to %USERPROFILE%\VendorProofBackups; first run pulled supabase/postgres:17.12 image (~1 min).
+- **Remote state:** both projects only have migrations 0000–0002; staging holds real rows (2 users/2 workspaces/1 project), test nearly empty.
+- **Restore rehearsal:** schema+data restored into disposable vendorproof_restore; 101 errors all Supabase-managed roles/extensions — app tables (19) and staging rows verified. Confirms logical backup is recoverable for application data.
+- **Gotcha:** data-only dump emits INSERTs (not COPY) and excludes auth/storage-managed schemas; role dump does not preserve passwords.
+
+## GitHub connect "link already used" — 2026-11-19
+
+- **Root cause:** Swytchcode's hosted auth page (auth.swytchcode.com, Vite/React StrictMode) exchanges the single-use `state` token twice on mount; the second call always returns "already used".
+- **Fix:** `server/src/swytchcode/direct-connect.ts` replicates the page's own exchange server-side — `state_token` → widget session → `_widgets/DataIntegrations/{slug}/authorize` → returns the final WorkOS authorize-redirect URL directly to the browser, skipping the buggy page entirely.
+- **Verified:** POST `/sources/:id/connect` now returns `https://api.workos.com/data-integrations/.../authorize-redirect` instead of the widget URL.
+
+## GitHub tenant connect saga — 2026-11-19 (full record)
+
+- **Symptom:** Integrations UI "Connect GitHub" → popup showed "This link was already used". Root cause: Swytchcode hosted auth page (Vite/React StrictMode) exchanges the single-use `state` token twice; second call always fails.
+- **Attempt 1 — server-side bypass:** `direct-connect.ts` replicates the page's exchange (state_token → widget session → `_widgets/DataIntegrations/{slug}/authorize`) and returns the WorkOS authorize-redirect URL. Works mechanically, BUT the resulting tenant credential is a WorkOS data-integration credential that `github.pull.get` cannot refresh: "credential package returned a different provider".
+- **Attempt 2 — CLI `--json` + manual WorkOS links:** same widget authorize path → same provider mismatch. The alternate integration slug `github-07fb0bac` has a misconfigured GitHub OAuth app (redirect_uri not associated) — dead end.
+- **Attempt 3 — owner-level reconnect:** `swy auth connect github` (owner) succeeded and shows `connected`, but tenant exec still fails because the TENANT credential itself is the wrong package type.
+- **Key insight:** connections made through `_widgets/DataIntegrations/*` (the web widget path, including our API bypass) produce incompatible credentials for the GitHub library executor. The WORKING path is the interactive CLI: `swy auth connect github --tenant <id> --library github` — it opens the browser, user approves, CLI completes the proper oauth2 credential. This is how the original working connection was made.
+- **Remaining defect to fix properly:** the web UI connect flow cannot produce a working GitHub tenant credential until Swytchcode fixes their auth page + credential packaging. Documented limitation; Stripe connect (saveKey) is unaffected.
+- **Also fixed en route:** `JSON.stringify(...)::jsonb` double-encoded jsonb params (billing_run insert crashed run creation; scope_rule keywords, invoice snapshot same latent bug) → switched to `tx.json()`; `Invalid date` crash on run start (Postgres returns Date objects) → ISO slice fix; CSRF self-heal in api client.

@@ -1,12 +1,13 @@
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import postgres from 'postgres'
 import { config } from '../platform/config.js'
 import { logger } from '../platform/logger.js'
 
 if (!config.DATABASE_URL) throw new Error('DATABASE_URL is required to run migrations')
 const client = postgres(config.DATABASE_URL, { max: 1, prepare: false })
-const migrationsFolder = new URL('./migrations', import.meta.url).pathname
+const migrationsFolder = fileURLToPath(new URL('./migrations/', import.meta.url))
 
 try {
   await client`create table if not exists __vendorproof_migrations (name varchar(255) primary key, applied_at timestamptz not null default now())`

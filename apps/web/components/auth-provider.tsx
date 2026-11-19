@@ -11,10 +11,11 @@ type AuthContextValue = {
   setActiveWorkspaceId: (id: string) => void
   refresh: () => Promise<Session | null>
   register: (input: {
-    email: string
     name: string
+    email: string
     password: string
     workspaceName?: string
+    accountType?: string
   }) => Promise<void>
   login: (input: { email: string; password: string }) => Promise<void>
   logout: () => Promise<void>
@@ -83,10 +84,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const register = async (input: {
-    email: string
     name: string
+    email: string
     password: string
     workspaceName?: string
+    accountType?: string
   }) => {
     setError(null)
     const result = await authApi.register(input)
