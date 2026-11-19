@@ -171,3 +171,9 @@ The GSAP warnings had two confirmed source patterns in `landing-experience.tsx`:
 - **Portal overview joins:** joining client/workspace tables under a context without `app.workspace_id` returned empty; fixed by iterating memberships and querying per-workspace.
 - **Stripe checkout schema:** `stripe.session.create1` requires `line_items` as an index-keyed object (`{"0": {...}}`), rejects array form; `payment_method_types` is deprecated by Stripe — removed. Real checkout session created successfully in test mode.
 - **Payment truth:** invoices are marked paid only after `stripe.session.get` reports `payment_status=paid`; the browser redirect is never trusted.
+
+## Two-sided registration + provider UI — 2026-11-19
+
+- **Registration intent:** added `app_user.signup_intent` (migration 0009) with provider/client/both choice at signup; client signups route to `/portal`, providers to `/app`; login routes portal members to `/portal`.
+- **Provider UI gaps closed:** contracts page gained propose/accept-version actions; invoices page gained issue-to-client + issued list; project detail gained deliverable create/submit and share-with-client.
+- **Known limitation:** client-only signup still creates a personal workspace (required by the auth/workspace model); it is never exposed as a provider dashboard unless the user has provider memberships.
