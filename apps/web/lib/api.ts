@@ -79,6 +79,45 @@ export async function apiRequest<T>(
     | undefined
   if (payload?.csrfToken) csrfToken = payload.csrfToken
   if (response.status === 401) notifySessionExpiry()
+  if (payload?.code === 'CSRF_INVALID' && !options.signal?.aborted) {
+    try {
+      const session = await apiRequest<Session>('/api/v1/auth/me', { method: 'GET' })
+      if (session?.csrfToken) {
+        csrfToken = session.csrfToken
+        headers.set('x-csrf-token', csrfToken)
+        const retryResponse = await fetch(requestUrl, {
+          ...requestOptions,
+          method,
+          headers,
+          credentials: 'include',
+          body: options.body === undefined ? undefined : JSON.stringify(options.body),
+          cache: 'no-store',
+        })
+        readCsrfHeader(retryResponse)
+        const retryPayload = (await retryResponse.json().catch(() => undefined)) as
+          | (ApiEnvelope<T> & {
+              code?: string
+              message?: string
+              requestId?: string
+              csrfToken?: string
+            })
+          | undefined
+        if (retryPayload?.csrfToken) csrfToken = retryPayload.csrfToken
+        if (!retryResponse.ok)
+          throw new VendorProofApiError(
+            retryPayload?.message ?? 'The request could not be completed.',
+            {
+              code: retryPayload?.code,
+              requestId: retryPayload?.requestId,
+              status: retryResponse.status,
+            },
+          )
+        return retryPayload && 'data' in retryPayload ? retryPayload.data : (retryPayload as T)
+      }
+    } catch (cause) {
+      if (cause instanceof VendorProofApiError) throw cause
+    }
+  }
   if (!response.ok)
     throw new VendorProofApiError(payload?.message ?? 'The request could not be completed.', {
       code: payload?.code,
