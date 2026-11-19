@@ -185,3 +185,9 @@ The GSAP warnings had two confirmed source patterns in `landing-experience.tsx`:
 - **Remote state:** both projects only have migrations 0000–0002; staging holds real rows (2 users/2 workspaces/1 project), test nearly empty.
 - **Restore rehearsal:** schema+data restored into disposable vendorproof_restore; 101 errors all Supabase-managed roles/extensions — app tables (19) and staging rows verified. Confirms logical backup is recoverable for application data.
 - **Gotcha:** data-only dump emits INSERTs (not COPY) and excludes auth/storage-managed schemas; role dump does not preserve passwords.
+
+## GitHub connect "link already used" — 2026-11-19
+
+- **Root cause:** Swytchcode's hosted auth page (auth.swytchcode.com, Vite/React StrictMode) exchanges the single-use `state` token twice on mount; the second call always returns "already used".
+- **Fix:** `server/src/swytchcode/direct-connect.ts` replicates the page's own exchange server-side — `state_token` → widget session → `_widgets/DataIntegrations/{slug}/authorize` → returns the final WorkOS authorize-redirect URL directly to the browser, skipping the buggy page entirely.
+- **Verified:** POST `/sources/:id/connect` now returns `https://api.workos.com/data-integrations/.../authorize-redirect` instead of the widget URL.

@@ -17,6 +17,7 @@ import {
 } from '../../modules/reconciliation/state-machine.js'
 import { authenticate, requireContext, setDbContext } from '../../modules/core.js'
 import { GithubAdapter } from '../../providers/github/adapter.js'
+import { resolveDirectAuthUrl } from '../../swytchcode/direct-connect.js'
 import { unavailableExecutor, type SwytchcodeExecutor } from '../../swytchcode/executor.js'
 const uuid = z.string().uuid()
 const paramsSchema = z.object({ workspaceId: uuid, projectId: uuid }).strict()
@@ -272,7 +273,10 @@ export async function phase2Routes(app: FastifyInstance, options: Phase2RouteOpt
           async (tx) =>
             tx`insert into audit_event (workspace_id, actor_user_id, action, entity_type, entity_id, after_data, request_id) values (${workspaceId}, ${auth.userId}, 'source.connection_initiated', 'source_connection', ${source.id}, ${JSON.stringify({ provider: source.provider, repository: `${source.repository_owner}/${source.repository_name}` })}, ${safeCorrelationId(request)})`,
         )
-        return ok(reply, { url: result.url, expiresInSeconds: 600 })
+        const directUrl = await resolveDirectAuthUrl(result.url, source.provider).catch(
+          () => undefined,
+        )
+        return ok(reply, { url: directUrl ?? result.url, expiresInSeconds: 600 })
       } catch {
         fail(503, 'SWYTCHCODE_CONNECTION_FAILED', 'GitHub connection could not be started')
       }
