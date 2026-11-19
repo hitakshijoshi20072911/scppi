@@ -177,3 +177,11 @@ The GSAP warnings had two confirmed source patterns in `landing-experience.tsx`:
 - **Registration intent:** added `app_user.signup_intent` (migration 0009) with provider/client/both choice at signup; client signups route to `/portal`, providers to `/app`; login routes portal members to `/portal`.
 - **Provider UI gaps closed:** contracts page gained propose/accept-version actions; invoices page gained issue-to-client + issued list; project detail gained deliverable create/submit and share-with-client.
 - **Known limitation:** client-only signup still creates a personal workspace (required by the auth/workspace model); it is never exposed as a provider dashboard unless the user has provider memberships.
+
+## Supabase backup + migration rehearsal — 2026-11-19
+
+- **CLI auth:** `supabase login` browser flow stored token under user profile; projects list confirmed 2 VendorProof projects (test `opffskvpzppozdpjahze` ap-south-1, staging `lmvxfopnczeuxgxugoxe` ap-southeast-1), both Free/ACTIVE_HEALTHY/PG 17.11.
+- **Backups:** 3 dumps per project (schema, --data-only, --role-only) to %USERPROFILE%\VendorProofBackups; first run pulled supabase/postgres:17.12 image (~1 min).
+- **Remote state:** both projects only have migrations 0000–0002; staging holds real rows (2 users/2 workspaces/1 project), test nearly empty.
+- **Restore rehearsal:** schema+data restored into disposable vendorproof_restore; 101 errors all Supabase-managed roles/extensions — app tables (19) and staging rows verified. Confirms logical backup is recoverable for application data.
+- **Gotcha:** data-only dump emits INSERTs (not COPY) and excludes auth/storage-managed schemas; role dump does not preserve passwords.
